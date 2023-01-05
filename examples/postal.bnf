@@ -17,6 +17,6 @@
 <last-name> ::= "Smith" | "Jones" | "Williams" | "Taylor" | "Brown" | "Davies" | "Evans" | "Thomas"
 <house-num> ::= <funny-numbers-haha>
 <street-name> ::= "MEDITATION LANE" | "SILVER CANOE WAY" | "GENTLE RAIN DRIVE" | "LOCH NESS ROAD" | "GRANDIOSE DRIVE" | "MELODY DRIVE" | "MISTLETOE LANE" | "GOLDEN TROUT WAY" | "CHARDONNAY DRIVE" | "DIXIE AVENUE"
-<town-name> ::= "Balls-Creek" | "Sober-Island" | "Mushaboom" | "Lower-Economy"
+<town-name> ::= "Balls Creek" | "Sober Island" | "Mushaboom" | "Lower Economy"
 <state-code> ::= "AD" | "AR" | "AS" | "BR" | "CG" | "DL" | "GA" | "GJ" | "HR" | "HP" | "JK" | "JH" | "KA" | "KL" | "LD" | "MP" | "MH" | "MN" | "ML" | "MZ" | "NL" | "OD" | "PY" | "PB" | "RJ" | "SK" | "TN" | "TS" | "TR" | "UP" | "UK" | "WB"
 <ZIP-code> ::= "10001" | "10002" | "11101" | "11212" | "23220" | "33101" | "10003" | "20001" | "11201" | "10011"
