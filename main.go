@@ -52,23 +52,23 @@ type TokenKind int
 
 const (
 	TokenInvalid TokenKind = iota
-	TokenSym
-	TokenDef
-	TokenAlt
-	TokenStr
+	TokenSymbol
+	TokenDefinition
+	TokenAlternation
+	TokenString
 )
 
 func TokenKindName(kind TokenKind) string {
 	switch kind {
 	case TokenInvalid:
 		return "invalid token"
-	case TokenSym:
+	case TokenSymbol:
 		return "symbol"
-	case TokenDef:
+	case TokenDefinition:
 		return "definition symbol"
-	case TokenAlt:
+	case TokenAlternation:
 		return "alternation symbol"
-	case TokenStr:
+	case TokenString:
 		return "string literal"
 	default:
 		panic("unreachable")
@@ -219,7 +219,7 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 			return
 		}
 
-		token.Kind = TokenSym
+		token.Kind = TokenSymbol
 		token.Text = string(lexer.Content[begin:lexer.Col])
 		lexer.Col += 1
 		return
@@ -231,14 +231,14 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		if err != nil {
 			return
 		}
-		token.Kind = TokenStr
+		token.Kind = TokenString
 		token.Text = lit
 		return
 	}
 
 	ColonColonEquals := []rune("::=")
 	if lexer.Prefix(ColonColonEquals) {
-		token.Kind = TokenDef
+		token.Kind = TokenDefinition
 		token.Text = string(ColonColonEquals)
 		lexer.Col += len(ColonColonEquals)
 		return
@@ -246,7 +246,7 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 
 	Equals := []rune("=")
 	if lexer.Prefix(Equals) {
-		token.Kind = TokenDef
+		token.Kind = TokenDefinition
 		token.Text = string(Equals)
 		lexer.Col += len(Equals)
 		return
@@ -254,7 +254,7 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 
 	Bar := []rune("|")
 	if lexer.Prefix(Bar) {
-		token.Kind = TokenAlt
+		token.Kind = TokenAlternation
 		token.Text = string(Bar)
 		lexer.Col += len(Bar)
 		return
@@ -295,10 +295,10 @@ func (lexer *Lexer) Next() (token Token, err error) {
 type ExprKind int
 
 const (
-	ExprSym ExprKind = iota
-	ExprStr
-	ExprAlt
-	ExprSeq
+	ExprSymbol ExprKind = iota
+	ExprString
+	ExprAlternation
+	ExprSequence
 )
 
 type Expr struct {
@@ -310,18 +310,18 @@ type Expr struct {
 
 func (expr Expr) String() string {
 	switch expr.Kind {
-	case ExprSym:
+	case ExprSymbol:
 		return fmt.Sprintf("<%s>", expr.Text)
-	case ExprStr:
+	case ExprString:
 		// TODO: escape the string
 		return fmt.Sprintf("\"%s\"", expr.Text)
-	case ExprAlt:
+	case ExprAlternation:
 		children := []string{}
 		for i := range expr.Children {
 			children = append(children, expr.Children[i].String())
 		}
 		return strings.Join(children, " | ")
-	case ExprSeq:
+	case ExprSequence:
 		children := []string{}
 		for i := range expr.Children {
 			children = append(children, expr.Children[i].String())
@@ -354,28 +354,28 @@ func ParseAtomicExpr(lexer *Lexer) (expr Expr, err error) {
 		if err == EndToken {
 			err = &DiagErr{
 				Loc: token.Loc,
-				Err: fmt.Errorf("Expected %s or %s, but got the end of the line", TokenKindName(TokenStr), TokenKindName(TokenSym)),
+				Err: fmt.Errorf("Expected %s or %s, but got the end of the line", TokenKindName(TokenString), TokenKindName(TokenSymbol)),
 			}
 		}
 		return
 	}
 	switch token.Kind {
-	case TokenSym:
+	case TokenSymbol:
 		expr = Expr{
-			Kind: ExprSym,
+			Kind: ExprSymbol,
 			Loc:  token.Loc,
 			Text: token.Text,
 		}
-	case TokenStr:
+	case TokenString:
 		expr = Expr{
-			Kind: ExprStr,
+			Kind: ExprString,
 			Loc:  token.Loc,
 			Text: token.Text,
 		}
 	default:
 		err = &DiagErr{
 			Loc: token.Loc,
-			Err: fmt.Errorf("Expected %s or %s, but got %s", TokenKindName(TokenStr), TokenKindName(TokenSym), TokenKindName(token.Kind)),
+			Err: fmt.Errorf("Expected %s or %s, but got %s", TokenKindName(TokenString), TokenKindName(TokenSymbol), TokenKindName(token.Kind)),
 		}
 	}
 	return
@@ -389,7 +389,7 @@ func ParseSeqExpr(lexer *Lexer) (expr Expr, err error) {
 
 	var token Token
 	token, err = lexer.Peek()
-	if err != nil || (token.Kind != TokenSym && token.Kind != TokenStr) {
+	if err != nil || (token.Kind != TokenSymbol && token.Kind != TokenString) {
 		if err == EndToken {
 			err = nil
 		}
@@ -398,11 +398,11 @@ func ParseSeqExpr(lexer *Lexer) (expr Expr, err error) {
 
 	expr = Expr{
 		Loc:      expr.Loc,
-		Kind:     ExprSeq,
+		Kind:     ExprSequence,
 		Children: []Expr{expr},
 	}
 
-	for err == nil && (token.Kind == TokenSym || token.Kind == TokenStr) {
+	for err == nil && (token.Kind == TokenSymbol || token.Kind == TokenString) {
 		var child Expr
 		child, err = ParseAtomicExpr(lexer)
 		if err != nil {
@@ -427,7 +427,7 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 
 	var token Token
 	token, err = lexer.Peek()
-	if err != nil || token.Kind != TokenAlt {
+	if err != nil || token.Kind != TokenAlternation {
 		if err == EndToken {
 			err = nil
 		}
@@ -436,12 +436,12 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 
 	expr = Expr{
 		Loc:      expr.Loc,
-		Kind:     ExprAlt,
+		Kind:     ExprAlternation,
 		Children: []Expr{expr},
 	}
 
-	for err == nil && token.Kind == TokenAlt {
-		token, err = ExpectToken(lexer, TokenAlt)
+	for err == nil && token.Kind == TokenAlternation {
+		token, err = ExpectToken(lexer, TokenAlternation)
 		if err != nil {
 			return
 		}
@@ -471,11 +471,11 @@ type Rule struct {
 }
 
 func ParseRule(lexer *Lexer) (rule Rule, err error) {
-	rule.Head, err = ExpectToken(lexer, TokenSym)
+	rule.Head, err = ExpectToken(lexer, TokenSymbol)
 	if err != nil {
 		return
 	}
-	_, err = ExpectToken(lexer, TokenDef)
+	_, err = ExpectToken(lexer, TokenDefinition)
 	if err != nil {
 		return
 	}
@@ -486,9 +486,9 @@ func ParseRule(lexer *Lexer) (rule Rule, err error) {
 // TODO: limit the amount of loops
 func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message string, err error) {
 	switch expr.Kind {
-	case ExprStr:
+	case ExprString:
 		message = expr.Text
-	case ExprSym:
+	case ExprSymbol:
 		nextExpr, ok := grammar[expr.Text]
 		if !ok {
 			err = &DiagErr{
@@ -498,7 +498,7 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message string, 
 			return
 		}
 		message, err = GenerateRandomMessage(grammar, nextExpr.Body)
-	case ExprSeq:
+	case ExprSequence:
 		var sb strings.Builder
 		for i := range expr.Children {
 			var childMessage string
@@ -509,7 +509,7 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message string, 
 			sb.WriteString(childMessage)
 		}
 		message = sb.String()
-	case ExprAlt:
+	case ExprAlternation:
 		i := rand.Int31n(int32(len(expr.Children)))
 		message, err = GenerateRandomMessage(grammar, expr.Children[i])
 	}
