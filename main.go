@@ -56,6 +56,10 @@ const (
 	TokenDefinition
 	TokenAlternation
 	TokenString
+	TokenBracketOpen
+	TokenBracketClose
+	TokenCurlyOpen
+	TokenCurlyClose
 )
 
 func TokenKindName(kind TokenKind) string {
@@ -70,6 +74,14 @@ func TokenKindName(kind TokenKind) string {
 		return "alternation symbol"
 	case TokenString:
 		return "string literal"
+	case TokenBracketOpen:
+		return "open bracket"
+	case TokenBracketClose:
+		return "close bracket"
+	case TokenCurlyOpen:
+		return "open curly"
+	case TokenCurlyClose:
+		return "close curly"
 	default:
 		panic("unreachable")
 	}
@@ -236,28 +248,23 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		return
 	}
 
-	ColonColonEquals := []rune("::=")
-	if lexer.Prefix(ColonColonEquals) {
-		token.Kind = TokenDefinition
-		token.Text = string(ColonColonEquals)
-		lexer.Col += len(ColonColonEquals)
-		return
+	LiteralTokens := map[string]TokenKind {
+		"::=": TokenDefinition,
+		"=": TokenDefinition,
+		"|": TokenAlternation,
+		"[": TokenBracketOpen,
+		"]": TokenBracketClose,
+		"{": TokenCurlyOpen,
+		"}": TokenCurlyClose,
 	}
 
-	Equals := []rune("=")
-	if lexer.Prefix(Equals) {
-		token.Kind = TokenDefinition
-		token.Text = string(Equals)
-		lexer.Col += len(Equals)
-		return
-	}
-
-	Bar := []rune("|")
-	if lexer.Prefix(Bar) {
-		token.Kind = TokenAlternation
-		token.Text = string(Bar)
-		lexer.Col += len(Bar)
-		return
+	for name, kind := range LiteralTokens {
+		if lexer.Prefix([]rune(name)) {
+			token.Kind = kind
+			token.Text = name
+			lexer.Col += len([]rune(name))
+			return
+		}
 	}
 
 	err = &DiagErr{
@@ -299,6 +306,7 @@ const (
 	ExprString
 	ExprAlternation
 	ExprConcat
+	ExprRepetition
 )
 
 type Expr struct {
@@ -347,19 +355,55 @@ func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
 	return
 }
 
-func ParseAtomicExpr(lexer *Lexer) (expr Expr, err error) {
+func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 	var token Token
 	token, err = lexer.Next()
 	if err != nil {
 		if err == EndToken {
 			err = &DiagErr{
 				Loc: token.Loc,
-				Err: fmt.Errorf("Expected %s or %s, but got the end of the line", TokenKindName(TokenString), TokenKindName(TokenSymbol)),
+				Err: fmt.Errorf("Expected start of an expression, but got the end of the line"),
 			}
 		}
 		return
 	}
 	switch token.Kind {
+	case TokenCurlyOpen:
+		expr, err = ParseExpr(lexer)
+		if err != nil {
+			return
+		}
+		_, err = ExpectToken(lexer, TokenCurlyClose)
+		if err != nil {
+			return
+		}
+		expr = Expr{
+			Kind: ExprRepetition,
+			Loc: token.Loc,
+			Children: []Expr{
+				expr,
+			},
+		}
+	case TokenBracketOpen:
+		expr, err = ParseExpr(lexer)
+		if err != nil {
+			return
+		}
+		_, err = ExpectToken(lexer, TokenBracketClose)
+		if err != nil {
+			return
+		}
+		expr = Expr{
+			Kind: ExprAlternation,
+			Loc: token.Loc,
+			Children: []Expr{
+				expr,
+				Expr{
+					Kind: ExprString,
+					Loc: token.Loc,
+				},
+			},
+		}
 	case TokenSymbol:
 		expr = Expr{
 			Kind: ExprSymbol,
@@ -375,21 +419,21 @@ func ParseAtomicExpr(lexer *Lexer) (expr Expr, err error) {
 	default:
 		err = &DiagErr{
 			Loc: token.Loc,
-			Err: fmt.Errorf("Expected %s or %s, but got %s", TokenKindName(TokenString), TokenKindName(TokenSymbol), TokenKindName(token.Kind)),
+			Err: fmt.Errorf("Expected start of an expression, but got %s", TokenKindName(token.Kind)),
 		}
 	}
 	return
 }
 
 func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
-	expr, err = ParseAtomicExpr(lexer)
+	expr, err = ParsePrimaryExpr(lexer)
 	if err != nil {
 		return
 	}
 
 	var token Token
 	token, err = lexer.Peek()
-	if err != nil || (token.Kind != TokenSymbol && token.Kind != TokenString) {
+	if err != nil || (token.Kind != TokenSymbol && token.Kind != TokenString && token.Kind != TokenBracketOpen && token.Kind != TokenCurlyOpen) {
 		if err == EndToken {
 			err = nil
 		}
@@ -402,9 +446,9 @@ func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 		Children: []Expr{expr},
 	}
 
-	for err == nil && (token.Kind == TokenSymbol || token.Kind == TokenString) {
+	for err == nil && (token.Kind == TokenSymbol || token.Kind == TokenString || token.Kind == TokenBracketOpen || token.Kind == TokenCurlyOpen) {
 		var child Expr
-		child, err = ParseAtomicExpr(lexer)
+		child, err = ParsePrimaryExpr(lexer)
 		if err != nil {
 			return
 		}
@@ -512,6 +556,23 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message string, 
 	case ExprAlternation:
 		i := rand.Int31n(int32(len(expr.Children)))
 		message, err = GenerateRandomMessage(grammar, expr.Children[i])
+	case ExprRepetition:
+		MaxRepetition := 20
+		var sb strings.Builder
+		n := int(rand.Int31n(int32(MaxRepetition)))
+		for i := 0; i < n; i += 1 {
+			for j := range expr.Children {
+				var childMessage string
+				childMessage, err = GenerateRandomMessage(grammar, expr.Children[j])
+				if err != nil {
+					return
+				}
+				sb.WriteString(childMessage)
+			}
+		}
+		message = sb.String()
+	default:
+		panic("unreachable")
 	}
 	return
 }
