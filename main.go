@@ -236,11 +236,19 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		return
 	}
 
-	Def := []rune("::=")
-	if lexer.Prefix(Def) {
+	ColonColonEquals := []rune("::=")
+	if lexer.Prefix(ColonColonEquals) {
 		token.Kind = TokenDef
-		token.Text = string(Def)
-		lexer.Col += len(Def)
+		token.Text = string(ColonColonEquals)
+		lexer.Col += len(ColonColonEquals)
+		return
+	}
+
+	Equals := []rune("=")
+	if lexer.Prefix(Equals) {
+		token.Kind = TokenDef
+		token.Text = string(Equals)
+		lexer.Col += len(Equals)
 		return
 	}
 
