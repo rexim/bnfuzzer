@@ -298,7 +298,7 @@ const (
 	ExprSymbol ExprKind = iota
 	ExprString
 	ExprAlternation
-	ExprSequence
+	ExprConcat
 )
 
 type Expr struct {
@@ -321,7 +321,7 @@ func (expr Expr) String() string {
 			children = append(children, expr.Children[i].String())
 		}
 		return strings.Join(children, " | ")
-	case ExprSequence:
+	case ExprConcat:
 		children := []string{}
 		for i := range expr.Children {
 			children = append(children, expr.Children[i].String())
@@ -381,7 +381,7 @@ func ParseAtomicExpr(lexer *Lexer) (expr Expr, err error) {
 	return
 }
 
-func ParseSeqExpr(lexer *Lexer) (expr Expr, err error) {
+func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 	expr, err = ParseAtomicExpr(lexer)
 	if err != nil {
 		return
@@ -398,7 +398,7 @@ func ParseSeqExpr(lexer *Lexer) (expr Expr, err error) {
 
 	expr = Expr{
 		Loc:      expr.Loc,
-		Kind:     ExprSequence,
+		Kind:     ExprConcat,
 		Children: []Expr{expr},
 	}
 
@@ -420,7 +420,7 @@ func ParseSeqExpr(lexer *Lexer) (expr Expr, err error) {
 }
 
 func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
-	expr, err = ParseSeqExpr(lexer)
+	expr, err = ParseConcatExpr(lexer)
 	if err != nil {
 		return
 	}
@@ -446,7 +446,7 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 			return
 		}
 		var child Expr
-		child, err = ParseSeqExpr(lexer)
+		child, err = ParseConcatExpr(lexer)
 		if err != nil {
 			return
 		}
@@ -498,7 +498,7 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message string, 
 			return
 		}
 		message, err = GenerateRandomMessage(grammar, nextExpr.Body)
-	case ExprSequence:
+	case ExprConcat:
 		var sb strings.Builder
 		for i := range expr.Children {
 			var childMessage string
