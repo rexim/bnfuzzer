@@ -128,6 +128,12 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		return
 	}
 
+	if lexer.Prefix([]rune("//")) {
+		err = EndToken
+		lexer.Col = len(lexer.Content)
+		return
+	}
+
 	if lexer.Content[lexer.Col] == '<' {
 		begin := lexer.Col + 1
 		lexer.Col = begin
@@ -500,16 +506,20 @@ func main() {
 	}
 	grammar := map[string]Rule{}
 	for row, line := range strings.Split(string(content), "\n") {
-		if len(strings.TrimSpace(line)) > 0 {
-			lexer := NewLexer(line, *filePath, row)
-			rule, err := ParseRule(&lexer)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s\n", err)
-				os.Exit(1)
-			}
-			// TODO: check for redefinition
-			grammar[rule.Head.Text] = rule
+		lexer := NewLexer(line, *filePath, row)
+
+		_, err := lexer.Peek()
+		if err == EndToken {
+			continue
 		}
+
+		rule, err := ParseRule(&lexer)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+			os.Exit(1)
+		}
+		// TODO: check for redefinition
+		grammar[rule.Head.Text] = rule
 	}
 
 	if *entry == "!" {

@@ -1,3 +1,4 @@
+// Main definition of the postal dress
 <postal-address> ::= <name-part> <street-address> <zip-part>
 <name-part> ::= <personal-part> " " <last-name> " " <opt-suffix-part> "\n" | <personal-part> " " <name-part>
 <personal-part> ::= <initial> "." | <first-name>
@@ -6,6 +7,7 @@
 <opt-suffix-part> ::= "Sr." | "Jr." | <roman-numeral> | ""
 <opt-apt-num> ::= <apt-num> | ""
 
+// Just some test data
 <funny-numbers-haha> ::= "69" | "420" | "1337" | "69420" | "80085"
 <apt-num> ::= <funny-numbers-haha>
 <roman-numeral> ::= "I" | "II" | "III" | "IV" | "V" | "VI"
