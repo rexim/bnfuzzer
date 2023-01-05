@@ -7,5 +7,5 @@ Generate random messages based on their [BNF](https://en.wikipedia.org/wiki/Back
 Generate 10 random postal addresses:
 
 ```console
-$ go run ./main.go -file postal.bnf -entry postal-address -count 10
+$ go run ./main.go -file ./examples/postal.bnf -entry postal-address -count 10
 ```

@@ -118,6 +118,69 @@ func (lexer *Lexer) Loc() Loc {
 	}
 }
 
+func (lexer *Lexer) ChopStrLit() (lit string, err error) {
+	if lexer.Col >= len(lexer.Content) {
+		err = EndToken
+		return
+	}
+
+	quote := lexer.Content[lexer.Col]
+	lexer.Col += 1
+	begin := lexer.Col
+
+	var sb strings.Builder
+
+	loop: for lexer.Col < len(lexer.Content) {
+		switch lexer.Content[lexer.Col] {
+		case '\\':
+			if lexer.Col + 1 >= len(lexer.Content) {
+				err = &DiagErr{
+					Loc: lexer.Loc(),
+					Err: fmt.Errorf("Unfinished escape sequence"),
+				}
+				return
+			}
+			lexer.Col += 1
+			switch lexer.Content[lexer.Col] {
+			case 'n': sb.WriteRune('\n')
+			case '\\': sb.WriteRune('\\')
+			default:
+				if lexer.Content[lexer.Col] == quote {
+					sb.WriteRune(quote)
+				} else {
+					err = &DiagErr{
+						Loc: lexer.Loc(),
+						Err: fmt.Errorf("Unknown escape sequence starting with %c", lexer.Content[lexer.Col]),
+					}
+					return
+				}
+			}
+		default:
+			if lexer.Content[lexer.Col] == quote {
+				break loop
+			}
+			sb.WriteRune(lexer.Content[lexer.Col])
+		}
+		lexer.Col += 1
+	}
+
+	if lexer.Col >= len(lexer.Content) || lexer.Content[lexer.Col] != quote {
+		err = &DiagErr{
+			Loc: Loc{
+				FilePath: lexer.FilePath,
+				Row: lexer.Row,
+				Col: begin,
+			},
+			Err: fmt.Errorf("Expected '%c' at the end of this string literal", quote),
+		}
+		return
+	}
+
+	lit = sb.String()
+	lexer.Col += 1
+	return
+}
+
 func (lexer *Lexer) ChopToken() (token Token, err error) {
 	lexer.Trim()
 
@@ -162,52 +225,14 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		return
 	}
 
-	if lexer.Content[lexer.Col] == '"' {
-		begin := lexer.Col + 1
-		lexer.Col = begin
-
-		var sb strings.Builder
-
-		loop: for lexer.Col < len(lexer.Content) {
-			switch lexer.Content[lexer.Col] {
-			case '"':
-				break loop
-			case '\\':
-				if lexer.Col + 1 >= len(lexer.Content) {
-					err = &DiagErr{
-						Loc: lexer.Loc(),
-						Err: fmt.Errorf("Unfinished escape sequence"),
-					}
-					return
-				}
-				lexer.Col += 1
-				switch lexer.Content[lexer.Col] {
-				case '"': sb.WriteRune('"')
-				case 'n': sb.WriteRune('\n')
-				default:
-					err = &DiagErr{
-						Loc: lexer.Loc(),
-						Err: fmt.Errorf("Unknown escape sequence starting with %c", lexer.Content[lexer.Col]),
-					}
-					return
-				}
-			default:
-				sb.WriteRune(lexer.Content[lexer.Col])
-			}
-			lexer.Col += 1
-		}
-
-		if lexer.Col >= len(lexer.Content) {
-			err = &DiagErr{
-				Loc: lexer.Loc(),
-				Err: fmt.Errorf("Expected '\"' at the end of a string literal"),
-			}
+	if lexer.Content[lexer.Col] == '"' || lexer.Content[lexer.Col] == '\'' {
+		var lit string
+		lit, err = lexer.ChopStrLit()
+		if err != nil {
 			return
 		}
-
 		token.Kind = TokenStr
-		token.Text = sb.String()
-		lexer.Col += 1
+		token.Text = lit
 		return
 	}
 
