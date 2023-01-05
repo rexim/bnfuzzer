@@ -505,6 +505,7 @@ func main() {
 		os.Exit(1)
 	}
 	grammar := map[string]Rule{}
+	parsingError := false
 	for row, line := range strings.Split(string(content), "\n") {
 		lexer := NewLexer(line, *filePath, row)
 
@@ -513,13 +514,26 @@ func main() {
 			continue
 		}
 
-		rule, err := ParseRule(&lexer)
+		newRule, err := ParseRule(&lexer)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
-			os.Exit(1)
+			parsingError = true
+			continue
 		}
-		// TODO: check for redefinition
-		grammar[rule.Head.Text] = rule
+
+		existingRule, ok := grammar[newRule.Head.Text]
+		if ok {
+			fmt.Fprintf(os.Stderr, "%s: ERROR: redefinition of the rule %s\n", newRule.Head.Loc, newRule.Head.Text)
+			fmt.Fprintf(os.Stderr, "%s: NOTE: the first definition is located here\n", existingRule.Head.Loc)
+			parsingError = true
+			continue
+		}
+
+		grammar[newRule.Head.Text] = newRule
+	}
+
+	if parsingError {
+		os.Exit(1)
 	}
 
 	if *entry == "!" {
