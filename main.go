@@ -155,6 +155,7 @@ func (lexer *Lexer) ChopStrLit() (lit string, err error) {
 			lexer.Col += 1
 			switch lexer.Content[lexer.Col] {
 			case 'n': sb.WriteRune('\n')
+			case 'r': sb.WriteRune('\r')
 			case '\\': sb.WriteRune('\\')
 			default:
 				if lexer.Content[lexer.Col] == quote {

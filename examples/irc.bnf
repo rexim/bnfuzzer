@@ -6,8 +6,14 @@
 <command>  ::= <letter> { <letter> } | <number> <number> <number>
 <SPACE>    ::= ' ' { ' ' }
 <params>   ::= <SPACE> [ ':' <trailing> | <middle> <params> ]
-// 
+//
 // <middle>   ::= <Any *non-empty* sequence of octets not including SPACE or NUL or CR or LF, the first of which may not be ':'>
 // <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
-// 
-// <crlf>     ::= CR LF
+//
+
+<number>     ::= '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9'
+<letter>     ::= 'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g' | 'h' | 'i' | 'j' | 'k' | 'l' | 'm' | 'n' | 'o' | 'p' | 'q' | 'r' | 's' | 't' | 'u' | 'v' | 'w' | 'x' | 'y' | 'z' | 'A' | 'B' | 'C' | 'D' | 'E' | 'F' | 'G' | 'H' | 'I' | 'J' | 'K' | 'L' | 'M' | 'N' | 'O' | 'P' | 'Q' | 'R' | 'S' | 'T' | 'U' | 'V' | 'W' | 'X' | 'Y' | 'Z'
+<crlf>       ::= '\r\n'
+
+<servername> ::= <host>
+<host>       ::= "<TODO: host>" // see RFC 952 [DNS:4] for details on allowed hostnames
