@@ -557,6 +557,7 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message string, 
 		i := rand.Int31n(int32(len(expr.Children)))
 		message, err = GenerateRandomMessage(grammar, expr.Children[i])
 	case ExprRepetition:
+		// TODO: customizable MaxRepetition
 		MaxRepetition := 20
 		var sb strings.Builder
 		n := int(rand.Int31n(int32(MaxRepetition)))
