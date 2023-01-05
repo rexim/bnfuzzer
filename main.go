@@ -53,8 +53,8 @@ type TokenKind int
 const (
 	TokenInvalid TokenKind = iota
 	TokenSym
-	TokenRuleSep
-	TokenBar
+	TokenDef
+	TokenAlt
 	TokenStr
 )
 
@@ -64,10 +64,10 @@ func TokenKindName(kind TokenKind) string {
 		return "invalid token"
 	case TokenSym:
 		return "symbol"
-	case TokenRuleSep:
-		return "rule separator"
-	case TokenBar:
-		return "bar"
+	case TokenDef:
+		return "definition symbol"
+	case TokenAlt:
+		return "alternation symbol"
 	case TokenStr:
 		return "string literal"
 	default:
@@ -236,17 +236,17 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		return
 	}
 
-	RuleSep := []rune("::=")
-	if lexer.Prefix(RuleSep) {
-		token.Kind = TokenRuleSep
-		token.Text = string(RuleSep)
-		lexer.Col += len(RuleSep)
+	Def := []rune("::=")
+	if lexer.Prefix(Def) {
+		token.Kind = TokenDef
+		token.Text = string(Def)
+		lexer.Col += len(Def)
 		return
 	}
 
 	Bar := []rune("|")
 	if lexer.Prefix(Bar) {
-		token.Kind = TokenBar
+		token.Kind = TokenAlt
 		token.Text = string(Bar)
 		lexer.Col += len(Bar)
 		return
@@ -419,7 +419,7 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 
 	var token Token
 	token, err = lexer.Peek()
-	if err != nil || token.Kind != TokenBar {
+	if err != nil || token.Kind != TokenAlt {
 		if err == EndToken {
 			err = nil
 		}
@@ -432,8 +432,8 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 		Children: []Expr{expr},
 	}
 
-	for err == nil && token.Kind == TokenBar {
-		token, err = ExpectToken(lexer, TokenBar)
+	for err == nil && token.Kind == TokenAlt {
+		token, err = ExpectToken(lexer, TokenAlt)
 		if err != nil {
 			return
 		}
@@ -467,7 +467,7 @@ func ParseRule(lexer *Lexer) (rule Rule, err error) {
 	if err != nil {
 		return
 	}
-	_, err = ExpectToken(lexer, TokenRuleSep)
+	_, err = ExpectToken(lexer, TokenDef)
 	if err != nil {
 		return
 	}
