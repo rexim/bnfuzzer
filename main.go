@@ -89,7 +89,7 @@ func TokenKindName(kind TokenKind) string {
 
 type Token struct {
 	Kind TokenKind
-	Text string
+	Text []rune
 	Loc Loc
 }
 
@@ -130,7 +130,7 @@ func (lexer *Lexer) Loc() Loc {
 	}
 }
 
-func (lexer *Lexer) ChopStrLit() (lit string, err error) {
+func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 	if lexer.Col >= len(lexer.Content) {
 		err = EndToken
 		return
@@ -139,8 +139,6 @@ func (lexer *Lexer) ChopStrLit() (lit string, err error) {
 	quote := lexer.Content[lexer.Col]
 	lexer.Col += 1
 	begin := lexer.Col
-
-	var sb strings.Builder
 
 	loop: for lexer.Col < len(lexer.Content) {
 		switch lexer.Content[lexer.Col] {
@@ -154,12 +152,12 @@ func (lexer *Lexer) ChopStrLit() (lit string, err error) {
 			}
 			lexer.Col += 1
 			switch lexer.Content[lexer.Col] {
-			case 'n': sb.WriteRune('\n')
-			case 'r': sb.WriteRune('\r')
-			case '\\': sb.WriteRune('\\')
+			case 'n': lit = append(lit, '\n')
+			case 'r': lit = append(lit, '\r')
+			case '\\': lit = append(lit, '\\')
 			default:
 				if lexer.Content[lexer.Col] == quote {
-					sb.WriteRune(quote)
+					lit = append(lit, quote)
 				} else {
 					err = &DiagErr{
 						Loc: lexer.Loc(),
@@ -172,7 +170,7 @@ func (lexer *Lexer) ChopStrLit() (lit string, err error) {
 			if lexer.Content[lexer.Col] == quote {
 				break loop
 			}
-			sb.WriteRune(lexer.Content[lexer.Col])
+			lit = append(lit, lexer.Content[lexer.Col])
 		}
 		lexer.Col += 1
 	}
@@ -189,7 +187,6 @@ func (lexer *Lexer) ChopStrLit() (lit string, err error) {
 		return
 	}
 
-	lit = sb.String()
 	lexer.Col += 1
 	return
 }
@@ -233,13 +230,13 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		}
 
 		token.Kind = TokenSymbol
-		token.Text = string(lexer.Content[begin:lexer.Col])
+		token.Text = lexer.Content[begin:lexer.Col]
 		lexer.Col += 1
 		return
 	}
 
 	if lexer.Content[lexer.Col] == '"' || lexer.Content[lexer.Col] == '\'' {
-		var lit string
+		var lit []rune
 		lit, err = lexer.ChopStrLit()
 		if err != nil {
 			return
@@ -260,10 +257,11 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 	}
 
 	for name, kind := range LiteralTokens {
-		if lexer.Prefix([]rune(name)) {
+		runeName := []rune(name)
+		if lexer.Prefix(runeName) {
 			token.Kind = kind
-			token.Text = name
-			lexer.Col += len([]rune(name))
+			token.Text = runeName
+			lexer.Col += len(runeName)
 			return
 		}
 	}
@@ -313,7 +311,7 @@ const (
 type Expr struct {
 	Kind     ExprKind
 	Loc      Loc
-	Text     string
+	Text     []rune
 	Children []Expr
 }
 
@@ -529,50 +527,47 @@ func ParseRule(lexer *Lexer) (rule Rule, err error) {
 }
 
 // TODO: limit the amount of loops
-func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message string, err error) {
+func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, err error) {
 	switch expr.Kind {
 	case ExprString:
 		message = expr.Text
 	case ExprSymbol:
-		nextExpr, ok := grammar[expr.Text]
+		symbol := string(expr.Text)
+		nextExpr, ok := grammar[symbol]
 		if !ok {
 			err = &DiagErr{
 				Loc: expr.Loc,
-				Err: fmt.Errorf("Symbol <%s> is not defined", expr.Text),
+				Err: fmt.Errorf("Symbol <%s> is not defined", symbol),
 			}
 			return
 		}
 		message, err = GenerateRandomMessage(grammar, nextExpr.Body)
 	case ExprConcat:
-		var sb strings.Builder
 		for i := range expr.Children {
-			var childMessage string
+			var childMessage []rune
 			childMessage, err = GenerateRandomMessage(grammar, expr.Children[i])
 			if err != nil {
 				return
 			}
-			sb.WriteString(childMessage)
+			message = append(message, childMessage...)
 		}
-		message = sb.String()
 	case ExprAlternation:
 		i := rand.Int31n(int32(len(expr.Children)))
 		message, err = GenerateRandomMessage(grammar, expr.Children[i])
 	case ExprRepetition:
 		// TODO: customizable MaxRepetition
 		MaxRepetition := 20
-		var sb strings.Builder
 		n := int(rand.Int31n(int32(MaxRepetition)))
 		for i := 0; i < n; i += 1 {
 			for j := range expr.Children {
-				var childMessage string
+				var childMessage []rune
 				childMessage, err = GenerateRandomMessage(grammar, expr.Children[j])
 				if err != nil {
 					return
 				}
-				sb.WriteString(childMessage)
+				message = append(message, childMessage...)
 			}
 		}
-		message = sb.String()
 	default:
 		panic("unreachable")
 	}
@@ -617,15 +612,16 @@ func main() {
 			continue
 		}
 
-		existingRule, ok := grammar[newRule.Head.Text]
+		symbol := string(newRule.Head.Text)
+		existingRule, ok := grammar[symbol]
 		if ok {
-			fmt.Fprintf(os.Stderr, "%s: ERROR: redefinition of the rule %s\n", newRule.Head.Loc, newRule.Head.Text)
+			fmt.Fprintf(os.Stderr, "%s: ERROR: redefinition of the rule %s\n", newRule.Head.Loc, symbol)
 			fmt.Fprintf(os.Stderr, "%s: NOTE: the first definition is located here\n", existingRule.Head.Loc)
 			parsingError = true
 			continue
 		}
 
-		grammar[newRule.Head.Text] = newRule
+		grammar[symbol] = newRule
 	}
 
 	if parsingError {
@@ -656,6 +652,6 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 			os.Exit(1)
 		}
-		fmt.Println(message)
+		fmt.Println(string(message))
 	}
 }
