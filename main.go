@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"flag"
 	"fmt"
 	"math/rand"
@@ -51,7 +50,7 @@ func NewLexer(content string, filePath string, row int) Lexer {
 type TokenKind int
 
 const (
-	TokenInvalid TokenKind = iota
+	TokenEOL TokenKind = iota
 	TokenSymbol
 	TokenDefinition
 	TokenAlternation
@@ -64,8 +63,8 @@ const (
 
 func TokenKindName(kind TokenKind) string {
 	switch kind {
-	case TokenInvalid:
-		return "invalid token"
+	case TokenEOL:
+		return "end of line"
 	case TokenSymbol:
 		return "symbol"
 	case TokenDefinition:
@@ -92,8 +91,6 @@ type Token struct {
 	Text []rune
 	Loc Loc
 }
-
-var EndToken = errors.New("end token")
 
 func (lexer *Lexer) Trim() {
 	for lexer.Col < len(lexer.Content) && unicode.IsSpace(lexer.Content[lexer.Col]) {
@@ -132,7 +129,6 @@ func (lexer *Lexer) Loc() Loc {
 
 func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 	if lexer.Col >= len(lexer.Content) {
-		err = EndToken
 		return
 	}
 
@@ -194,16 +190,13 @@ func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 func (lexer *Lexer) ChopToken() (token Token, err error) {
 	lexer.Trim()
 
+	if lexer.Prefix([]rune("//")) {
+		lexer.Col = len(lexer.Content)
+	}
+
 	token.Loc = lexer.Loc()
 
 	if lexer.Col >= len(lexer.Content) {
-		err = EndToken
-		return
-	}
-
-	if lexer.Prefix([]rune("//")) {
-		err = EndToken
-		lexer.Col = len(lexer.Content)
 		return
 	}
 
@@ -315,30 +308,6 @@ type Expr struct {
 	Children []Expr
 }
 
-func (expr Expr) String() string {
-	switch expr.Kind {
-	case ExprSymbol:
-		return fmt.Sprintf("<%s>", expr.Text)
-	case ExprString:
-		// TODO: escape the string
-		return fmt.Sprintf("\"%s\"", expr.Text)
-	case ExprAlternation:
-		children := []string{}
-		for i := range expr.Children {
-			children = append(children, expr.Children[i].String())
-		}
-		return strings.Join(children, " | ")
-	case ExprConcat:
-		children := []string{}
-		for i := range expr.Children {
-			children = append(children, expr.Children[i].String())
-		}
-		return strings.Join(children, " ")
-	default:
-		panic("unreachable")
-	}
-}
-
 func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
 	token, err = lexer.Next()
 	if err != nil {
@@ -358,11 +327,12 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 	var token Token
 	token, err = lexer.Next()
 	if err != nil {
-		if err == EndToken {
-			err = &DiagErr{
-				Loc: token.Loc,
-				Err: fmt.Errorf("Expected start of an expression, but got the end of the line"),
-			}
+		return
+	}
+	if token.Kind == TokenEOL {
+		err = &DiagErr{
+			Loc: token.Loc,
+			Err: fmt.Errorf("Expected start of an expression, but got %s", TokenKindName(token.Kind)),
 		}
 		return
 	}
@@ -432,10 +402,10 @@ func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 
 	var token Token
 	token, err = lexer.Peek()
-	if err != nil || (token.Kind != TokenSymbol && token.Kind != TokenString && token.Kind != TokenBracketOpen && token.Kind != TokenCurlyOpen) {
-		if err == EndToken {
-			err = nil
-		}
+	if err != nil {
+		return
+	}
+	if token.Kind != TokenSymbol && token.Kind != TokenString && token.Kind != TokenBracketOpen && token.Kind != TokenCurlyOpen {
 		return
 	}
 
@@ -455,10 +425,6 @@ func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 		token, err = lexer.Peek()
 	}
 
-	if err == EndToken {
-		err = nil
-	}
-
 	return
 }
 
@@ -470,10 +436,10 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 
 	var token Token
 	token, err = lexer.Peek()
-	if err != nil || token.Kind != TokenAlternation {
-		if err == EndToken {
-			err = nil
-		}
+	if err != nil {
+		return
+	}
+	if token.Kind != TokenAlternation {
 		return
 	}
 
@@ -497,9 +463,6 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 		token, err = lexer.Peek()
 	}
 
-	if err == EndToken {
-		err = nil
-	}
 	return
 }
 
@@ -600,8 +563,8 @@ func main() {
 	for row, line := range strings.Split(string(content), "\n") {
 		lexer := NewLexer(line, *filePath, row)
 
-		_, err := lexer.Peek()
-		if err == EndToken {
+		token, err := lexer.Peek()
+		if err == nil && token.Kind == TokenEOL {
 			continue
 		}
 
