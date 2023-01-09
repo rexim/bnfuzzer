@@ -59,6 +59,7 @@ const (
 	TokenBracketClose
 	TokenCurlyOpen
 	TokenCurlyClose
+	TokenEllipsis
 )
 
 func TokenKindName(kind TokenKind) string {
@@ -81,6 +82,8 @@ func TokenKindName(kind TokenKind) string {
 		return "open curly"
 	case TokenCurlyClose:
 		return "close curly"
+	case TokenEllipsis:
+		return "ellipsis"
 	default:
 		panic("unreachable")
 	}
@@ -247,6 +250,7 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		"]": TokenBracketClose,
 		"{": TokenCurlyOpen,
 		"}": TokenCurlyClose,
+		"...": TokenEllipsis,
 	}
 
 	for name, kind := range LiteralTokens {
@@ -299,6 +303,7 @@ const (
 	ExprAlternation
 	ExprConcat
 	ExprRepetition
+	ExprRange
 )
 
 type Expr struct {
@@ -384,6 +389,45 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			Kind: ExprString,
 			Loc:  token.Loc,
 			Text: token.Text,
+		}
+		var ellipsis Token
+		ellipsis, err = lexer.Peek()
+		if err != nil {
+			return
+		}
+		if ellipsis.Kind == TokenEllipsis {
+			if len(expr.Text) != 1 {
+				err = &DiagErr{
+					Loc: expr.Loc,
+					Err: fmt.Errorf("The lower boundary of the range is expected to be 1 symbol string. Got %d instead.", len(expr.Text)),
+				}
+				return
+			}
+
+			lexer.PeekFull = false
+			var upper Token
+
+			upper, err = ExpectToken(lexer, TokenString)
+			if err != nil {
+				return
+			}
+
+			if len(upper.Text) != 1 {
+				err = &DiagErr{
+					Loc: upper.Loc,
+					Err: fmt.Errorf("The upper boundary of the range is expected to be 1 symbol string. Got %d instead.", len(upper.Text)),
+				}
+				return
+			}
+
+			expr = Expr{
+				Kind: ExprRange,
+				Loc: ellipsis.Loc,
+				Text: []rune{
+					expr.Text[0],
+					upper.Text[0],
+				},
+			}
 		}
 	default:
 		err = &DiagErr{
@@ -531,6 +575,24 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, 
 				message = append(message, childMessage...)
 			}
 		}
+	case ExprRange:
+		if len(expr.Text) != 2 {
+			err = &DiagErr{
+				Loc: expr.Loc,
+				Err: fmt.Errorf("Unexpected arity of range. Expected 2 but got %d.", len(expr.Text)),
+			}
+			return
+		}
+
+		if expr.Text[0] > expr.Text[1] {
+			err = &DiagErr{
+				Loc: expr.Loc,
+				Err: fmt.Errorf("Upper bound of the range is lower than the lower one."),
+			}
+			return
+		}
+
+		message = append(message, expr.Text[0] + rand.Int31n(expr.Text[1] - expr.Text[0] + 1))
 	default:
 		panic("unreachable")
 	}
@@ -549,7 +611,7 @@ func main() {
 		os.Exit(1)
 	}
 	if len(*entry) == 0 {
-		fmt.Fprintf(os.Stderr, "ERROR: -symbol is not provided\n")
+		fmt.Fprintf(os.Stderr, "ERROR: -entry is not provided\n")
 		flag.Usage()
 		os.Exit(1)
 	}
@@ -571,6 +633,13 @@ func main() {
 		newRule, err := ParseRule(&lexer)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
+			parsingError = true
+			continue
+		}
+
+		_, err = ExpectToken(&lexer, TokenEOL)
+		if err != nil {
+			fmt.Fprintf(os. Stderr, "%s\n", err)
 			parsingError = true
 			continue
 		}
