@@ -599,6 +599,48 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, 
 	return
 }
 
+func VerifyThatAllSymbolsDefinedInExpr(grammar map[string]Rule, expr Expr) (ok bool) {
+	ok = true
+	switch expr.Kind {
+	case ExprSymbol:
+		symbol := string(expr.Text)
+		if _, symbolExists := grammar[symbol]; !symbolExists {
+			ok = false
+			fmt.Fprintf(os.Stderr, "%s: ERROR: Symbol %s is not defined\n", expr.Loc, symbol)
+		}
+		return
+
+	case ExprAlternation:
+		fallthrough
+	case ExprConcat:
+		fallthrough
+	case ExprRepetition:
+		for _, child := range expr.Children {
+			if !VerifyThatAllSymbolsDefinedInExpr(grammar, child) {
+				ok = false
+			}
+		}
+		return
+
+	case ExprString:
+		fallthrough
+	case ExprRange:
+		return
+
+	default: panic("unreachable")
+	}
+}
+
+func VerifyThatAllSymbolsDefined(grammar map[string]Rule) (ok bool) {
+	ok = true
+	for _, expr := range grammar {
+		if !VerifyThatAllSymbolsDefinedInExpr(grammar, expr.Body) {
+			ok = false
+		}
+	}
+	return
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	filePath := flag.String("file", "", "Path to the BNF file")
@@ -675,6 +717,11 @@ func main() {
 	expr, ok := grammar[*entry]
 	if !ok {
 		fmt.Printf("ERROR: Symbol %s is not defined\n", *entry)
+		os.Exit(1)
+	}
+
+	ok = VerifyThatAllSymbolsDefined(grammar)
+	if !ok {
 		os.Exit(1)
 	}
 
