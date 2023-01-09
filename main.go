@@ -646,6 +646,7 @@ func main() {
 	filePath := flag.String("file", "", "Path to the BNF file")
 	entry := flag.String("entry", "", "The symbol name to start generating from. Passing '!' as the symbol name lists all of the available symbols in the -file.")
 	count := flag.Int("count", 1, "How many messages to generate")
+	verify := flag.Bool("verify", false, "Verify that all the symbols are defined")
 	flag.Parse()
 	if len(*filePath) == 0 {
 		fmt.Fprintf(os.Stderr, "ERROR: -file is not provided\n")
@@ -720,9 +721,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	ok = VerifyThatAllSymbolsDefined(grammar)
-	if !ok {
-		os.Exit(1)
+	if *verify {
+		ok = VerifyThatAllSymbolsDefined(grammar)
+		if !ok {
+			os.Exit(1)
+		}
 	}
 
 	for i := 0; i < *count; i += 1 {
