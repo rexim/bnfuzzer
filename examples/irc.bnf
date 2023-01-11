@@ -6,10 +6,10 @@
 <command>  ::= <letter> { <letter> } | <number> <number> <number>
 <SPACE>    ::= ' ' { ' ' }
 <params>   ::= <SPACE> [ ':' <trailing> | <middle> <params> ]
-//
 // <middle>   ::= <Any *non-empty* sequence of octets not including SPACE or NUL or CR or LF, the first of which may not be ':'>
+<middle> ::= "\x00" ... "\xFF" - " \0\r\n:" { <nonwhite> }
 // <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
-//
+<trailing> ::= { "\x00" ... "\xFF" - "\0\r\n" }
 
 <nick>       ::= <letter> { <letter> | <number> | <special> }
 <user>       ::= <nonwhite> { <nonwhite> }
