@@ -10,16 +10,15 @@
 <middle> ::= "\x00" ... "\xFF" - " \0\r\n:" { <nonwhite> }
 // <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
 <trailing> ::= { "\x00" ... "\xFF" - "\0\r\n" }
+<crlf>       ::= '\r\n'
 
 <nick>       ::= <letter> { <letter> | <number> | <special> }
 <user>       ::= <nonwhite> { <nonwhite> }
-
 <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
 <number>     ::= '0' ... '9'
 <special>    ::= '-' | '[' | ']' | '\\' | '`' | '^' | '{' | '}'
-<crlf>       ::= '\r\n'
 // <nonwhite> ::= <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
 <nonwhite>   ::= "\x00" ... "\xFF" - " \0\r\n"
 
 <servername> ::= <host>
-<host>       ::= "<TODO: host>" // see RFC 952 [DNS:4] for details on allowed hostnames
+<host>       ::= "<host>" // see RFC 952 [DNS:4] for details on allowed hostnames
