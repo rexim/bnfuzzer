@@ -1,6 +1,10 @@
 // THIS SYNTAX IS A WORK IN PROGRESS!!!
 
 // RFC 1459
+
+// TODO: try to implement https://www.rfc-editor.org/rfc/rfc2812#section-2.3.1 instead
+// It seems to have more details
+
 <message>  ::= [':' <prefix> <SPACE> ] <command> <params> <crlf>
 <prefix>   ::= <servername> | <nick> [ '!' <user> ] [ '@' <host> ]
 <command>  ::= <letter> { <letter> } | <number> <number> <number>
