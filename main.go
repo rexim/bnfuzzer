@@ -53,7 +53,7 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, 
 			}
 		}
 	case ExprRange:
-		if len(expr.Text) != 2 {
+		if len(expr.Text) < 2 {
 			err = &DiagErr{
 				Loc: expr.Loc,
 				Err: fmt.Errorf("Unexpected arity of range. Expected 2 but got %d.", len(expr.Text)),
@@ -61,7 +61,11 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, 
 			return
 		}
 
-		if expr.Text[0] > expr.Text[1] {
+		lower := expr.Text[0]
+		upper := expr.Text[1]
+		except := expr.Text[2:]
+
+		if lower > upper {
 			err = &DiagErr{
 				Loc: expr.Loc,
 				Err: fmt.Errorf("Upper bound of the range is lower than the lower one."),
@@ -69,7 +73,18 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, 
 			return
 		}
 
-		message = append(message, expr.Text[0] + rand.Int31n(expr.Text[1] - expr.Text[0] + 1))
+		// This is dumb, but good enough for now
+		MaxExceptAttempts := 1000
+		again: for i := 0; i < MaxExceptAttempts; i += 1 {
+			x := lower + rand.Int31n(upper - lower + 1)
+			for i := range except {
+				if except[i] == x {
+					continue again
+				}
+			}
+			message = append(message, lower + rand.Int31n(upper - lower + 1))
+			break again
+		}
 	default:
 		panic("unreachable")
 	}

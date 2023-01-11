@@ -135,6 +135,22 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 					upper.Text[0],
 				},
 			}
+
+			var dash Token
+			dash, err = lexer.Peek()
+			if err != nil {
+				return
+			}
+			if dash.Kind == TokenDash {
+				lexer.PeekFull = false
+				var except Token
+				except, err = ExpectToken(lexer, TokenString)
+				if err != nil {
+					return
+				}
+
+				expr.Text = append(expr.Text, except.Text...)
+			}
 		}
 	default:
 		err = &DiagErr{

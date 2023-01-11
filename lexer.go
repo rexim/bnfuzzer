@@ -54,6 +54,7 @@ const (
 	TokenCurlyOpen
 	TokenCurlyClose
 	TokenEllipsis
+	TokenDash
 )
 
 func TokenKindName(kind TokenKind) string {
@@ -78,6 +79,8 @@ func TokenKindName(kind TokenKind) string {
 		return "close curly"
 	case TokenEllipsis:
 		return "ellipsis"
+	case TokenDash:
+		return "dash"
 	default:
 		panic("unreachable")
 	}
@@ -145,6 +148,9 @@ func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 			}
 
 			switch lexer.Content[lexer.Col] {
+			case '0':
+				lit = append(lit, 0)
+				lexer.Col += 1
 			case 'n':
 				lit = append(lit, '\n')
 				lexer.Col += 1
@@ -280,6 +286,7 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		"{": TokenCurlyOpen,
 		"}": TokenCurlyClose,
 		"...": TokenEllipsis,
+		"-": TokenDash,
 	}
 
 	for name, kind := range LiteralTokens {
