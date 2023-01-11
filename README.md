@@ -1,4 +1,4 @@
-# Go BNF Fuzzer
+# BNF Fuzzer
 
 Generate random messages based on their [BNF](https://en.wikipedia.org/wiki/Backus%E2%80%93Naur_form) definition.
 
