@@ -11,10 +11,14 @@
 // <trailing> ::= <Any, possibly *empty*, sequence of octets not including NUL or CR or LF>
 //
 
+<nick>       ::= <letter> { <letter> | <number> | <special> }
+<user>       ::= <nonwhite> { <nonwhite> }
+
 <letter>     ::= 'a' ... 'z' | 'A' ... 'Z'
 <number>     ::= '0' ... '9'
 <special>    ::= '-' | '[' | ']' | '\\' | '`' | '^' | '{' | '}'
 <crlf>       ::= '\r\n'
+<nonwhite>   ::= "\x01" ... "\x09" | "\x0B" ... "\x0C" | "\x0F" ... "\x19" | "\x21" ... "\xFF" // <any 8bit code except SPACE (0x20), NUL (0x0), CR (0xd), and LF (0xa)>
 
 <servername> ::= <host>
 <host>       ::= "<TODO: host>" // see RFC 952 [DNS:4] for details on allowed hostnames

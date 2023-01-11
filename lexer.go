@@ -134,23 +134,58 @@ func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 	begin := lexer.Col
 
 	loop: for lexer.Col < len(lexer.Content) {
-		switch lexer.Content[lexer.Col] {
-		case '\\':
-			if lexer.Col + 1 >= len(lexer.Content) {
+		if lexer.Content[lexer.Col] == '\\' {
+			lexer.Col += 1
+			if lexer.Col >= len(lexer.Content) {
 				err = &DiagErr{
 					Loc: lexer.Loc(),
 					Err: fmt.Errorf("Unfinished escape sequence"),
 				}
 				return
 			}
-			lexer.Col += 1
+
 			switch lexer.Content[lexer.Col] {
-			case 'n': lit = append(lit, '\n')
-			case 'r': lit = append(lit, '\r')
-			case '\\': lit = append(lit, '\\')
+			case 'n':
+				lit = append(lit, '\n')
+				lexer.Col += 1
+			case 'r':
+				lit = append(lit, '\r')
+				lexer.Col += 1
+			case '\\':
+				lit = append(lit, '\\')
+				lexer.Col += 1
+			case 'x':
+				lexer.Col += 1
+				var result rune = 0
+				for i := 0; i < 2; i += 1 {
+					if lexer.Col >= len(lexer.Content) {
+						err = &DiagErr{
+							Loc: lexer.Loc(),
+							Err: fmt.Errorf("Unfinished hexadecimal value of a byte. Expected 2 hex digits, but got %d.", i),
+						}
+						return
+					}
+					x := lexer.Content[lexer.Col]
+					if '0' <= x && x <= '9' {
+						result = result*0x10 + x - '0'
+					} else if 'a' <= x && x <= 'f' {
+						result = result*0x10 + x - 'a' + 10
+					} else if 'A' <= x && x <= 'F' {
+						result = result*0x10 + x - 'A' + 10
+					} else {
+						err = &DiagErr{
+							Loc: lexer.Loc(),
+							Err: fmt.Errorf("Expected hex digit, but got `%c`", x),
+						}
+						return
+					}
+					lexer.Col += 1
+				}
+				lit = append(lit, result)
 			default:
 				if lexer.Content[lexer.Col] == quote {
 					lit = append(lit, quote)
+					lexer.Col += 1
 				} else {
 					err = &DiagErr{
 						Loc: lexer.Loc(),
@@ -159,13 +194,13 @@ func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 					return
 				}
 			}
-		default:
+		} else {
 			if lexer.Content[lexer.Col] == quote {
 				break loop
 			}
 			lit = append(lit, lexer.Content[lexer.Col])
+			lexer.Col += 1
 		}
-		lexer.Col += 1
 	}
 
 	if lexer.Col >= len(lexer.Content) || lexer.Content[lexer.Col] != quote {
@@ -179,8 +214,8 @@ func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 		}
 		return
 	}
-
 	lexer.Col += 1
+
 	return
 }
 
