@@ -53,37 +53,46 @@ const (
 	TokenBracketClose
 	TokenCurlyOpen
 	TokenCurlyClose
+	TokenParenOpen
+	TokenParenClose
 	TokenEllipsis
 	TokenDash
+	TokenNumber
+	TokenAsterisk
 )
 
-func TokenKindName(kind TokenKind) string {
-	switch kind {
-	case TokenEOL:
-		return "end of line"
-	case TokenSymbol:
-		return "symbol"
-	case TokenDefinition:
-		return "definition symbol"
-	case TokenAlternation:
-		return "alternation symbol"
-	case TokenString:
-		return "string literal"
-	case TokenBracketOpen:
-		return "open bracket"
-	case TokenBracketClose:
-		return "close bracket"
-	case TokenCurlyOpen:
-		return "open curly"
-	case TokenCurlyClose:
-		return "close curly"
-	case TokenEllipsis:
-		return "ellipsis"
-	case TokenDash:
-		return "dash"
-	default:
-		panic("unreachable")
-	}
+var TokenKindName = map[TokenKind]string{
+	TokenEOL: "end of line",
+	TokenSymbol: "symbol",
+	TokenDefinition: "definition symbol",
+	TokenAlternation: "alternation symbol",
+	TokenString: "string literal",
+	TokenBracketOpen: "open bracket",
+	TokenBracketClose: "close bracket",
+	TokenCurlyOpen: "open curly",
+	TokenCurlyClose: "close curly",
+	TokenParenOpen: "open paren",
+	TokenParenClose: "close paren",
+	TokenEllipsis: "ellipsis",
+	TokenDash: "dash",
+	TokenNumber: "number",
+	TokenAsterisk: "asterisk",
+}
+
+var LiteralTokens = map[string]TokenKind{
+	"::=": TokenDefinition,
+	"=": TokenDefinition,
+	"|": TokenAlternation,
+	"/": TokenAlternation,
+	"[": TokenBracketOpen,
+	"]": TokenBracketClose,
+	"{": TokenCurlyOpen,
+	"}": TokenCurlyClose,
+	"(": TokenParenOpen,
+	")": TokenParenClose,
+	"...": TokenEllipsis,
+	"-": TokenDash,
+	"*": TokenAsterisk,
 }
 
 type Token struct {
@@ -225,6 +234,14 @@ func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 	return
 }
 
+func IsSymbolStart(ch rune) bool {
+	return unicode.IsLetter(ch) || ch == '-' || ch == '_'
+}
+
+func IsSymbol(ch rune) bool {
+	return unicode.IsLetter(ch) || unicode.IsNumber(ch) || ch == '-' || ch == '_'
+}
+
 func (lexer *Lexer) ChopToken() (token Token, err error) {
 	lexer.Trim()
 
@@ -238,12 +255,34 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		return
 	}
 
+	if unicode.IsNumber(lexer.Content[lexer.Col]) {
+		begin := lexer.Col
+		for lexer.Col < len(lexer.Content) && unicode.IsNumber(lexer.Content[lexer.Col]) {
+			lexer.Col += 1
+		}
+		token.Kind = TokenNumber
+		token.Text = lexer.Content[begin:lexer.Col]
+		return
+	}
+
+	if IsSymbolStart(lexer.Content[lexer.Col]) {
+		begin := lexer.Col
+
+		for lexer.Col < len(lexer.Content) && IsSymbol(lexer.Content[lexer.Col]) {
+			lexer.Col += 1
+		}
+
+		token.Kind = TokenSymbol
+		token.Text = lexer.Content[begin:lexer.Col]
+		return
+	}
+
 	if lexer.Content[lexer.Col] == '<' {
 		begin := lexer.Col + 1
 		lexer.Col = begin
 		for lexer.Col < len(lexer.Content) && lexer.Content[lexer.Col] != '>' {
 			ch := lexer.Content[lexer.Col]
-			if !unicode.IsLetter(ch) && !unicode.IsNumber(ch) && ch != '-' && ch != '_' {
+			if !IsSymbol(ch) {
 				err = &DiagErr{
 					Loc: lexer.Loc(),
 					Err: fmt.Errorf("Unexpected character in symbol name %c", ch),
@@ -275,18 +314,6 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		token.Kind = TokenString
 		token.Text = lit
 		return
-	}
-
-	LiteralTokens := map[string]TokenKind {
-		"::=": TokenDefinition,
-		"=": TokenDefinition,
-		"|": TokenAlternation,
-		"[": TokenBracketOpen,
-		"]": TokenBracketClose,
-		"{": TokenCurlyOpen,
-		"}": TokenCurlyClose,
-		"...": TokenEllipsis,
-		"-": TokenDash,
 	}
 
 	for name, kind := range LiteralTokens {

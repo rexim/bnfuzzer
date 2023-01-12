@@ -28,7 +28,7 @@ func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
 	if token.Kind != kind {
 		err = &DiagErr{
 			Loc: token.Loc,
-			Err: fmt.Errorf("Expected %s but got %s", TokenKindName(kind), TokenKindName(token.Kind)),
+			Err: fmt.Errorf("Expected %s but got %s", TokenKindName[kind], TokenKindName[token.Kind]),
 		}
 		return
 	}
@@ -41,14 +41,16 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 	if err != nil {
 		return
 	}
-	if token.Kind == TokenEOL {
-		err = &DiagErr{
-			Loc: token.Loc,
-			Err: fmt.Errorf("Expected start of an expression, but got %s", TokenKindName(token.Kind)),
-		}
-		return
-	}
 	switch token.Kind {
+	case TokenParenOpen:
+		expr, err = ParseExpr(lexer)
+		if err != nil {
+			return
+		}
+		_, err = ExpectToken(lexer, TokenParenClose)
+		if err != nil {
+			return
+		}
 	case TokenCurlyOpen:
 		expr, err = ParseExpr(lexer)
 		if err != nil {
@@ -152,13 +154,37 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 				expr.Text = append(expr.Text, except.Text...)
 			}
 		}
+
+	case TokenNumber:
+		panic("TODO: variable repetition without lower bound")
+
+	case TokenNumber:
+		var asterisk Token
+		asterisk, err = lexer.Peek()
+		if err != nil {
+			return
+		}
+		if asterisk.Kind != TokenAsterisk {
+			panic("TODO: specific repetition")
+		}
+
+		panic("TODO: variable repetition with lower bound")
 	default:
 		err = &DiagErr{
 			Loc: token.Loc,
-			Err: fmt.Errorf("Expected start of an expression, but got %s", TokenKindName(token.Kind)),
+			Err: fmt.Errorf("Expected start of an expression, but got %s", TokenKindName[token.Kind]),
 		}
 	}
 	return
+}
+
+func IsPrimaryStart(kind TokenKind) bool {
+	return kind == TokenSymbol ||
+		kind == TokenString ||
+		kind == TokenBracketOpen ||
+		kind == TokenCurlyOpen ||
+		kind == TokenParenOpen ||
+		kind == TokenNumber
 }
 
 func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
@@ -172,7 +198,7 @@ func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 	if err != nil {
 		return
 	}
-	if token.Kind != TokenSymbol && token.Kind != TokenString && token.Kind != TokenBracketOpen && token.Kind != TokenCurlyOpen {
+	if !IsPrimaryStart(token.Kind) {
 		return
 	}
 
@@ -182,7 +208,7 @@ func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 		Children: []Expr{expr},
 	}
 
-	for err == nil && (token.Kind == TokenSymbol || token.Kind == TokenString || token.Kind == TokenBracketOpen || token.Kind == TokenCurlyOpen) {
+	for err == nil && IsPrimaryStart(token.Kind) {
 		var child Expr
 		child, err = ParsePrimaryExpr(lexer)
 		if err != nil {
