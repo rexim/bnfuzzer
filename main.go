@@ -12,60 +12,50 @@ import (
 
 // TODO: limit the amount of loops
 func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, err error) {
-	switch expr.Kind {
+	switch expr := expr.(type) {
 	case ExprString:
 		message = expr.Text
 	case ExprSymbol:
-		symbol := string(expr.Text)
-		nextExpr, ok := grammar[symbol]
+		nextExpr, ok := grammar[expr.Name]
 		if !ok {
 			err = &DiagErr{
 				Loc: expr.Loc,
-				Err: fmt.Errorf("Symbol <%s> is not defined", symbol),
+				Err: fmt.Errorf("Symbol <%s> is not defined", expr.Name),
 			}
 			return
 		}
 		message, err = GenerateRandomMessage(grammar, nextExpr.Body)
 	case ExprConcat:
-		for i := range expr.Children {
+		for i := range expr.Elements {
+			var element []rune
+			element, err = GenerateRandomMessage(grammar, expr.Elements[i])
+			if err != nil {
+				return
+			}
+			message = append(message, element...)
+		}
+	case ExprAlternation:
+		i := rand.Int31n(int32(len(expr.Variants)))
+		message, err = GenerateRandomMessage(grammar, expr.Variants[i])
+	case ExprRepetition:
+		if expr.Lower > expr.Upper {
+			err = &DiagErr{
+				Loc: expr.Loc,
+				Err: fmt.Errorf("Upper bound of the repetition is lower than the lower one."),
+			}
+			return
+		}
+		n := int(int32(expr.Lower) + rand.Int31n(int32(expr.Upper - expr.Lower + 1)))
+		for i := 0; i < n; i += 1 {
 			var childMessage []rune
-			childMessage, err = GenerateRandomMessage(grammar, expr.Children[i])
+			childMessage, err = GenerateRandomMessage(grammar, expr.Body)
 			if err != nil {
 				return
 			}
 			message = append(message, childMessage...)
 		}
-	case ExprAlternation:
-		i := rand.Int31n(int32(len(expr.Children)))
-		message, err = GenerateRandomMessage(grammar, expr.Children[i])
-	case ExprRepetition:
-		// TODO: customizable MaxRepetition
-		MaxRepetition := 20
-		n := int(rand.Int31n(int32(MaxRepetition)))
-		for i := 0; i < n; i += 1 {
-			for j := range expr.Children {
-				var childMessage []rune
-				childMessage, err = GenerateRandomMessage(grammar, expr.Children[j])
-				if err != nil {
-					return
-				}
-				message = append(message, childMessage...)
-			}
-		}
 	case ExprRange:
-		if len(expr.Text) < 2 {
-			err = &DiagErr{
-				Loc: expr.Loc,
-				Err: fmt.Errorf("Unexpected arity of range. Expected 2 but got %d.", len(expr.Text)),
-			}
-			return
-		}
-
-		lower := expr.Text[0]
-		upper := expr.Text[1]
-		except := expr.Text[2:]
-
-		if lower > upper {
+		if expr.Lower > expr.Upper {
 			err = &DiagErr{
 				Loc: expr.Loc,
 				Err: fmt.Errorf("Upper bound of the range is lower than the lower one."),
@@ -73,18 +63,7 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, 
 			return
 		}
 
-		// This is dumb, but good enough for now
-		MaxExceptAttempts := 1000
-		again: for i := 0; i < MaxExceptAttempts; i += 1 {
-			x := lower + rand.Int31n(upper - lower + 1)
-			for i := range except {
-				if except[i] == x {
-					continue again
-				}
-			}
-			message = append(message, lower + rand.Int31n(upper - lower + 1))
-			break again
-		}
+		message = append(message, expr.Lower + rand.Int31n(expr.Upper - expr.Lower + 1))
 	default:
 		panic("unreachable")
 	}
@@ -93,29 +72,39 @@ func GenerateRandomMessage(grammar map[string]Rule, expr Expr) (message []rune, 
 
 func VerifyThatAllSymbolsDefinedInExpr(grammar map[string]Rule, expr Expr) (ok bool) {
 	ok = true
-	switch expr.Kind {
+	switch expr := expr.(type) {
 	case ExprSymbol:
-		symbol := string(expr.Text)
-		if _, symbolExists := grammar[symbol]; !symbolExists {
+		if _, exists := grammar[expr.Name]; !exists {
 			ok = false
-			fmt.Fprintf(os.Stderr, "%s: ERROR: Symbol %s is not defined\n", expr.Loc, symbol)
+			fmt.Fprintf(os.Stderr, "%s: ERROR: Symbol %s is not defined\n", expr.Loc, expr.Name)
 		}
 		return
 
 	case ExprAlternation:
-		fallthrough
-	case ExprConcat:
-		fallthrough
-	case ExprRepetition:
-		for _, child := range expr.Children {
-			if !VerifyThatAllSymbolsDefinedInExpr(grammar, child) {
+		for i := range expr.Variants {
+			if !VerifyThatAllSymbolsDefinedInExpr(grammar, expr.Variants[i]) {
 				ok = false
 			}
 		}
 		return
 
+	case ExprConcat:
+		for i := range expr.Elements {
+			if !VerifyThatAllSymbolsDefinedInExpr(grammar, expr.Elements[i]) {
+				ok = false
+			}
+		}
+		return
+
+	case ExprRepetition:
+		if !VerifyThatAllSymbolsDefinedInExpr(grammar, expr.Body) {
+			ok = false
+		}
+		return
+
 	case ExprString:
-		fallthrough
+		return
+
 	case ExprRange:
 		return
 

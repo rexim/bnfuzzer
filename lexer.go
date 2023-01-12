@@ -56,7 +56,6 @@ const (
 	TokenParenOpen
 	TokenParenClose
 	TokenEllipsis
-	TokenDash
 	TokenNumber
 	TokenAsterisk
 )
@@ -74,7 +73,6 @@ var TokenKindName = map[TokenKind]string{
 	TokenParenOpen: "open paren",
 	TokenParenClose: "close paren",
 	TokenEllipsis: "ellipsis",
-	TokenDash: "dash",
 	TokenNumber: "number",
 	TokenAsterisk: "asterisk",
 }
@@ -91,7 +89,6 @@ var LiteralTokens = map[string]TokenKind{
 	"(": TokenParenOpen,
 	")": TokenParenClose,
 	"...": TokenEllipsis,
-	"-": TokenDash,
 	"*": TokenAsterisk,
 }
 

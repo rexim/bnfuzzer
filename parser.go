@@ -2,22 +2,65 @@ package main
 
 import "fmt"
 
-type ExprKind int
+type Expr interface {
+	GetLoc() Loc
+}
 
-const (
-	ExprSymbol ExprKind = iota
-	ExprString
-	ExprAlternation
-	ExprConcat
-	ExprRepetition
-	ExprRange
-)
+type ExprSymbol struct {
+	Loc Loc
+	Name string
+}
 
-type Expr struct {
-	Kind     ExprKind
-	Loc      Loc
-	Text     []rune
-	Children []Expr
+func (expr ExprSymbol) GetLoc() Loc {
+	return expr.Loc
+}
+
+type ExprString struct {
+	Loc Loc
+	Text []rune
+}
+
+func (expr ExprString) GetLoc() Loc {
+	return expr.Loc
+}
+
+type ExprAlternation struct {
+	Loc Loc
+	Variants []Expr
+}
+
+func (expr ExprAlternation) GetLoc() Loc {
+	return expr.Loc
+}
+
+type ExprConcat struct {
+	Loc Loc
+	Elements []Expr
+}
+
+func (expr ExprConcat) GetLoc() Loc {
+	return expr.Loc
+}
+
+type ExprRepetition struct {
+	Loc Loc
+	Body Expr
+	Lower uint
+	Upper uint
+}
+
+func (expr ExprRepetition) GetLoc() Loc {
+	return expr.Loc
+}
+
+type ExprRange struct {
+	Loc Loc
+	Lower rune
+	Upper rune
+}
+
+func (expr ExprRange) GetLoc() Loc {
+	return expr.Loc
 }
 
 func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
@@ -34,6 +77,8 @@ func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
 	}
 	return
 }
+
+const CurlyBracesMaxRepeition = 20
 
 func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 	var token Token
@@ -52,7 +97,8 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			return
 		}
 	case TokenCurlyOpen:
-		expr, err = ParseExpr(lexer)
+		var body Expr
+		body, err = ParseExpr(lexer)
 		if err != nil {
 			return
 		}
@@ -60,15 +106,15 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 		if err != nil {
 			return
 		}
-		expr = Expr{
-			Kind: ExprRepetition,
+		expr = ExprRepetition{
 			Loc: token.Loc,
-			Children: []Expr{
-				expr,
-			},
+			Body: body,
+			Lower: 0,
+			Upper: CurlyBracesMaxRepeition, // TODO: customizable max repetition for curly braces
 		}
 	case TokenBracketOpen:
-		expr, err = ParseExpr(lexer)
+		var body Expr
+		body, err = ParseExpr(lexer)
 		if err != nil {
 			return
 		}
@@ -76,86 +122,62 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 		if err != nil {
 			return
 		}
-		expr = Expr{
-			Kind: ExprAlternation,
+		expr = ExprRepetition{
 			Loc: token.Loc,
-			Children: []Expr{
-				expr,
-				Expr{
-					Kind: ExprString,
-					Loc: token.Loc,
-				},
-			},
+			Body: body,
+			Lower: 0,
+			Upper: 1,
 		}
 	case TokenSymbol:
-		expr = Expr{
-			Kind: ExprSymbol,
+		expr = ExprSymbol{
 			Loc:  token.Loc,
-			Text: token.Text,
+			Name: string(token.Text),
 		}
 	case TokenString:
-		expr = Expr{
-			Kind: ExprString,
-			Loc:  token.Loc,
-			Text: token.Text,
-		}
 		var ellipsis Token
 		ellipsis, err = lexer.Peek()
 		if err != nil {
 			return
 		}
-		if ellipsis.Kind == TokenEllipsis {
-			if len(expr.Text) != 1 {
-				err = &DiagErr{
-					Loc: expr.Loc,
-					Err: fmt.Errorf("The lower boundary of the range is expected to be 1 symbol string. Got %d instead.", len(expr.Text)),
-				}
-				return
+		if ellipsis.Kind != TokenEllipsis {
+			expr = ExprString{
+				Loc: token.Loc,
+				Text: token.Text,
 			}
-
-			lexer.PeekFull = false
-			var upper Token
-
-			upper, err = ExpectToken(lexer, TokenString)
-			if err != nil {
-				return
-			}
-
-			if len(upper.Text) != 1 {
-				err = &DiagErr{
-					Loc: upper.Loc,
-					Err: fmt.Errorf("The upper boundary of the range is expected to be 1 symbol string. Got %d instead.", len(upper.Text)),
-				}
-				return
-			}
-
-			expr = Expr{
-				Kind: ExprRange,
-				Loc: ellipsis.Loc,
-				Text: []rune{
-					expr.Text[0],
-					upper.Text[0],
-				},
-			}
-
-			var dash Token
-			dash, err = lexer.Peek()
-			if err != nil {
-				return
-			}
-			if dash.Kind == TokenDash {
-				lexer.PeekFull = false
-				var except Token
-				except, err = ExpectToken(lexer, TokenString)
-				if err != nil {
-					return
-				}
-
-				expr.Text = append(expr.Text, except.Text...)
-			}
+			return
 		}
 
-	case TokenNumber:
+		if len(token.Text) != 1 {
+			err = &DiagErr{
+				Loc: token.Loc,
+				Err: fmt.Errorf("The lower boundary of the range is expected to be 1 symbol string. Got %d instead.", len(token.Text)),
+			}
+			return
+		}
+
+		lexer.PeekFull = false
+		var upper Token
+
+		upper, err = ExpectToken(lexer, TokenString)
+		if err != nil {
+			return
+		}
+
+		if len(upper.Text) != 1 {
+			err = &DiagErr{
+				Loc: upper.Loc,
+				Err: fmt.Errorf("The upper boundary of the range is expected to be 1 symbol string. Got %d instead.", len(upper.Text)),
+			}
+			return
+		}
+
+		expr = ExprRange{
+			Loc: ellipsis.Loc,
+			Lower: token.Text[0],
+			Upper: upper.Text[0],
+		}
+
+	case TokenAsterisk:
 		panic("TODO: variable repetition without lower bound")
 
 	case TokenNumber:
@@ -188,7 +210,8 @@ func IsPrimaryStart(kind TokenKind) bool {
 }
 
 func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
-	expr, err = ParsePrimaryExpr(lexer)
+	var primary Expr
+	primary, err = ParsePrimaryExpr(lexer)
 	if err != nil {
 		return
 	}
@@ -199,13 +222,13 @@ func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 		return
 	}
 	if !IsPrimaryStart(token.Kind) {
+		expr = primary
 		return
 	}
 
-	expr = Expr{
-		Loc:      expr.Loc,
-		Kind:     ExprConcat,
-		Children: []Expr{expr},
+	concat := ExprConcat{
+		Loc:      primary.GetLoc(),
+		Elements: []Expr{primary},
 	}
 
 	for err == nil && IsPrimaryStart(token.Kind) {
@@ -214,15 +237,17 @@ func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
 		if err != nil {
 			return
 		}
-		expr.Children = append(expr.Children, child)
+		concat.Elements = append(concat.Elements, child)
 		token, err = lexer.Peek()
 	}
 
+	expr = concat
 	return
 }
 
 func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
-	expr, err = ParseConcatExpr(lexer)
+	var concat Expr
+	concat, err = ParseConcatExpr(lexer)
 	if err != nil {
 		return
 	}
@@ -233,13 +258,13 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 		return
 	}
 	if token.Kind != TokenAlternation {
+		expr = concat
 		return
 	}
 
-	expr = Expr{
-		Loc:      expr.Loc,
-		Kind:     ExprAlternation,
-		Children: []Expr{expr},
+	alt := ExprAlternation{
+		Loc:      concat.GetLoc(),
+		Variants: []Expr{concat},
 	}
 
 	for err == nil && token.Kind == TokenAlternation {
@@ -252,10 +277,11 @@ func ParseAltExpr(lexer *Lexer) (expr Expr, err error) {
 		if err != nil {
 			return
 		}
-		expr.Children = append(expr.Children, child)
+		alt.Variants = append(alt.Variants, child)
 		token, err = lexer.Peek()
 	}
 
+	expr = alt
 	return
 }
 
