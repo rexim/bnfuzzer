@@ -178,7 +178,11 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 		}
 
 	case TokenAsterisk:
-		panic("TODO: variable repetition without lower bound")
+		err = &DiagErr{
+			Loc: token.Loc,
+			Err: fmt.Errorf("TODO: variable repetition without lower bound"),
+		}
+		return
 
 	case TokenNumber:
 		var asterisk Token
@@ -186,11 +190,20 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 		if err != nil {
 			return
 		}
+
 		if asterisk.Kind != TokenAsterisk {
-			panic("TODO: specific repetition")
+			err = &DiagErr{
+				Loc: token.Loc,
+				Err: fmt.Errorf("TODO: specific repetition"),
+			}
+			return
 		}
 
-		panic("TODO: variable repetition with lower bound")
+		err = &DiagErr{
+			Loc: token.Loc,
+			Err: fmt.Errorf("TODO: variable repetition with lower bound"),
+		}
+		return
 	default:
 		err = &DiagErr{
 			Loc: token.Loc,
