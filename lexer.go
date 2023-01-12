@@ -58,6 +58,7 @@ const (
 	TokenEllipsis
 	TokenNumber
 	TokenAsterisk
+	TokenIncrementalAlternative
 )
 
 var TokenKindName = map[TokenKind]string{
@@ -75,21 +76,28 @@ var TokenKindName = map[TokenKind]string{
 	TokenEllipsis: "ellipsis",
 	TokenNumber: "number",
 	TokenAsterisk: "asterisk",
+	TokenIncrementalAlternative: "incremental alternative",
 }
 
-var LiteralTokens = map[string]TokenKind{
-	"::=": TokenDefinition,
-	"=": TokenDefinition,
-	"|": TokenAlternation,
-	"/": TokenAlternation,
-	"[": TokenBracketOpen,
-	"]": TokenBracketClose,
-	"{": TokenCurlyOpen,
-	"}": TokenCurlyClose,
-	"(": TokenParenOpen,
-	")": TokenParenClose,
-	"...": TokenEllipsis,
-	"*": TokenAsterisk,
+type LiteralToken struct {
+	Text string
+	Kind TokenKind
+}
+
+var LiteralTokens = []LiteralToken{
+	{ Text: "::=", Kind: TokenDefinition },
+	{ Text: "=/", Kind: TokenIncrementalAlternative },
+	{ Text: "=", Kind: TokenDefinition },
+	{ Text: "|", Kind: TokenAlternation },
+	{ Text: "/", Kind: TokenAlternation },
+	{ Text: "[", Kind: TokenBracketOpen },
+	{ Text: "]", Kind: TokenBracketClose },
+	{ Text: "{", Kind: TokenCurlyOpen },
+	{ Text: "}", Kind: TokenCurlyClose },
+	{ Text: "(", Kind: TokenParenOpen },
+	{ Text: ")", Kind: TokenParenClose },
+	{ Text: "...", Kind: TokenEllipsis },
+	{ Text: "*", Kind: TokenAsterisk },
 }
 
 type Token struct {
@@ -317,10 +325,10 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		return
 	}
 
-	for name, kind := range LiteralTokens {
-		runeName := []rune(name)
+	for i := range LiteralTokens {
+		runeName := []rune(LiteralTokens[i].Text)
 		if lexer.Prefix(runeName) {
-			token.Kind = kind
+			token.Kind = LiteralTokens[i].Kind
 			token.Text = runeName
 			lexer.Col += len(runeName)
 			return
