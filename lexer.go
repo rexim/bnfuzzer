@@ -95,6 +95,7 @@ var LiteralTokens = map[string]TokenKind{
 type Token struct {
 	Kind TokenKind
 	Text []rune
+	Number uint
 	Loc Loc
 }
 
@@ -254,7 +255,10 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 
 	if unicode.IsNumber(lexer.Content[lexer.Col]) {
 		begin := lexer.Col
+		token.Number = 0
 		for lexer.Col < len(lexer.Content) && unicode.IsNumber(lexer.Content[lexer.Col]) {
+			token.Number *= 10
+			token.Number += uint(lexer.Content[lexer.Col] - '0')
 			lexer.Col += 1
 		}
 		token.Kind = TokenNumber

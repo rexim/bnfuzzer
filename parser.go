@@ -78,7 +78,7 @@ func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
 	return
 }
 
-const CurlyBracesMaxRepeition = 20
+const MaxUnspecifiedUpperRepetitionBound = 20
 
 func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 	var token Token
@@ -110,7 +110,7 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			Loc: token.Loc,
 			Body: body,
 			Lower: 0,
-			Upper: CurlyBracesMaxRepeition, // TODO: customizable max repetition for curly braces
+			Upper: MaxUnspecifiedUpperRepetitionBound, // TODO: customizable max unspecified upper repetition bound
 		}
 	case TokenBracketOpen:
 		var body Expr
@@ -191,17 +191,50 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			return
 		}
 
+		var body Expr
+
 		if asterisk.Kind != TokenAsterisk {
-			err = &DiagErr{
+			body, err = ParsePrimaryExpr(lexer)
+			if err != nil {
+				return
+			}
+			expr = ExprRepetition{
 				Loc: token.Loc,
-				Err: fmt.Errorf("TODO: specific repetition"),
+				Lower: token.Number,
+				Upper: token.Number,
+				Body: body,
 			}
 			return
 		}
 
-		err = &DiagErr{
-			Loc: token.Loc,
-			Err: fmt.Errorf("TODO: variable repetition with lower bound"),
+		lexer.PeekFull = false;
+
+		var upper Token
+		upper, err = lexer.Peek()
+
+		if upper.Kind != TokenNumber {
+			body, err = ParsePrimaryExpr(lexer)
+			if err != nil {
+				return
+			}
+			expr = ExprRepetition{
+				Loc: asterisk.Loc,
+				Lower: token.Number,
+				Upper: MaxUnspecifiedUpperRepetitionBound,
+				Body: body,
+			}
+			return
+		}
+
+		body, err = ParsePrimaryExpr(lexer)
+		if err != nil {
+			return
+		}
+		expr = ExprRepetition{
+			Loc: asterisk.Loc,
+			Lower: token.Number,
+			Upper: upper.Number,
+			Body: body,
 		}
 		return
 	default:
