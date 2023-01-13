@@ -251,7 +251,7 @@ func IsSymbol(ch rune) bool {
 func (lexer *Lexer) ChopToken() (token Token, err error) {
 	lexer.Trim()
 
-	if lexer.Prefix([]rune("//")) {
+	if lexer.Prefix([]rune("//")) || lexer.Prefix([]rune(";")) {
 		lexer.Col = len(lexer.Content)
 	}
 
