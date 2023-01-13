@@ -200,7 +200,7 @@ func main() {
 				Body: body,
 			}
 
-		case TokenIncrementalAlternative:
+		case TokenIncAlternative:
 			if !ruleExists {
 				fmt.Fprintf(os.Stderr, "%s: ERROR: can't apply incremental alternative to a non-existing rule %s. You need to define it first.\n", head.Loc, symbol)
 				parsingError = true
@@ -234,7 +234,7 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s\n", &DiagErr{
 				Loc: def.Loc,
 				Err: fmt.Errorf("Expected %s or %s but got %s",
-					TokenKindName[TokenDefinition], TokenKindName[TokenIncrementalAlternative],
+					TokenKindName[TokenDefinition], TokenKindName[TokenIncAlternative],
 					TokenKindName[def.Kind]),
 			})
 			parsingError = true

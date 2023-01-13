@@ -58,7 +58,7 @@ const (
 	TokenEllipsis
 	TokenNumber
 	TokenAsterisk
-	TokenIncrementalAlternative
+	TokenIncAlternative
 )
 
 var TokenKindName = map[TokenKind]string{
@@ -76,7 +76,7 @@ var TokenKindName = map[TokenKind]string{
 	TokenEllipsis: "ellipsis",
 	TokenNumber: "number",
 	TokenAsterisk: "asterisk",
-	TokenIncrementalAlternative: "incremental alternative",
+	TokenIncAlternative: "incremental alternative",
 }
 
 type LiteralToken struct {
@@ -86,7 +86,7 @@ type LiteralToken struct {
 
 var LiteralTokens = []LiteralToken{
 	{ Text: "::=", Kind: TokenDefinition },
-	{ Text: "=/", Kind: TokenIncrementalAlternative },
+	{ Text: "=/", Kind: TokenIncAlternative },
 	{ Text: "=", Kind: TokenDefinition },
 	{ Text: "|", Kind: TokenAlternation },
 	{ Text: "/", Kind: TokenAlternation },
