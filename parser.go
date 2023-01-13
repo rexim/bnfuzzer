@@ -363,21 +363,3 @@ func ParseExpr(lexer *Lexer) (expr Expr, err error) {
 	expr, err = ParseAltExpr(lexer)
 	return
 }
-
-type Rule struct {
-	Head Token
-	Body Expr
-}
-
-func ParseRule(lexer *Lexer) (rule Rule, err error) {
-	rule.Head, err = ExpectToken(lexer, TokenSymbol)
-	if err != nil {
-		return
-	}
-	_, err = ExpectToken(lexer, TokenDefinition)
-	if err != nil {
-		return
-	}
-	rule.Body, err = ParseExpr(lexer)
-	return
-}

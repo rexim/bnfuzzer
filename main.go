@@ -122,6 +122,11 @@ func VerifyThatAllSymbolsDefined(grammar map[string]Rule) (ok bool) {
 	return
 }
 
+type Rule struct {
+	Head Token
+	Body Expr
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	filePath := flag.String("file", "", "Path to the BNF file")
@@ -154,9 +159,84 @@ func main() {
 			continue
 		}
 
-		newRule, err := ParseRule(&lexer)
+		var head Token
+		head, err = ExpectToken(&lexer, TokenSymbol)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
+			parsingError = true
+			continue
+		}
+
+		var def Token
+		def, err = lexer.Next()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+			parsingError = true
+			continue
+		}
+
+		symbol := string(head.Text)
+		existingRule, ruleExists := grammar[symbol]
+
+		switch def.Kind {
+		case TokenDefinition:
+			if ruleExists {
+				fmt.Fprintf(os.Stderr, "%s: ERROR: redefinition of the rule %s\n", head.Loc, symbol)
+				fmt.Fprintf(os.Stderr, "%s: NOTE: the first definition is located here\n", existingRule.Head.Loc)
+				parsingError = true
+				continue
+			}
+
+			var body Expr
+			body, err = ParseExpr(&lexer)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				parsingError = true
+				continue
+			}
+
+			grammar[symbol] = Rule{
+				Head: head,
+				Body: body,
+			}
+
+		case TokenIncrementalAlternative:
+			if !ruleExists {
+				fmt.Fprintf(os.Stderr, "%s: ERROR: can't apply incremental alternative to a non-existing rule %s. You need to define it first.\n", head.Loc, symbol)
+				parsingError = true
+				continue
+			}
+
+			var body Expr
+			body, err = ParseExpr(&lexer)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+				parsingError = true
+				continue
+			}
+
+			switch existingBody := existingRule.Body.(type) {
+			case ExprAlternation:
+				existingBody.Variants = append(existingBody.Variants, body)
+				existingRule.Body = existingBody
+			default:
+				existingRule.Body = ExprAlternation{
+					Loc: existingBody.GetLoc(),
+					Variants: []Expr{
+						existingBody,
+						body,
+					},
+				}
+			}
+
+			grammar[symbol] = existingRule
+		default:
+			fmt.Fprintf(os.Stderr, "%s\n", &DiagErr{
+				Loc: def.Loc,
+				Err: fmt.Errorf("Expected %s or %s but got %s",
+					TokenKindName[TokenDefinition], TokenKindName[TokenIncrementalAlternative],
+					TokenKindName[def.Kind]),
+			})
 			parsingError = true
 			continue
 		}
@@ -167,17 +247,6 @@ func main() {
 			parsingError = true
 			continue
 		}
-
-		symbol := string(newRule.Head.Text)
-		existingRule, ok := grammar[symbol]
-		if ok {
-			fmt.Fprintf(os.Stderr, "%s: ERROR: redefinition of the rule %s\n", newRule.Head.Loc, symbol)
-			fmt.Fprintf(os.Stderr, "%s: NOTE: the first definition is located here\n", existingRule.Head.Loc)
-			parsingError = true
-			continue
-		}
-
-		grammar[symbol] = newRule
 	}
 
 	if parsingError {
