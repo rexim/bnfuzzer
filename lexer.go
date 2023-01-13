@@ -337,29 +337,27 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 	if lexer.Prefix([]rune("%x")) {
 		lexer.Col += 2
 
-		var lower, upper rune
+		var value rune
 
-		lower, err = lexer.ChopHexByteValue()
+		value, err = lexer.ChopHexByteValue()
 		if err != nil {
 			return
 		}
+		token.Text = append(token.Text, value)
 
-		if !lexer.Prefix([]rune("-")) {
-			err = &DiagErr{
-				Loc: lexer.Loc(),
-				Err: fmt.Errorf("Expected dash between lower and upper bounds of value range token"),
+		if lexer.Prefix([]rune("-")) {
+			lexer.Col += 1
+
+			value, err = lexer.ChopHexByteValue()
+			if err != nil {
+				return
 			}
-			return
-		}
-		lexer.Col += 1
-
-		upper, err = lexer.ChopHexByteValue()
-		if err != nil {
-			return
+			token.Text = append(token.Text, value)
+			token.Kind = TokenValueRange
+		} else {
+			token.Kind = TokenString
 		}
 
-		token.Kind = TokenValueRange
-		token.Text = []rune{lower, upper}
 		return
 	}
 
