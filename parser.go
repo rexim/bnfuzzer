@@ -134,10 +134,20 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			Name: string(token.Text),
 		}
 	case TokenValueRange:
-		err = &DiagErr{
-			Loc: token.Loc,
-			Err: fmt.Errorf("TODO: Parsing value ranges is not implemented yet"),
+		if len(token.Text) != 2 {
+			err = &DiagErr{
+				Loc: token.Loc,
+				Err: fmt.Errorf("Value range is expected to have 2 bounds but got %d", len(token.Text)),
+			}
+			return
 		}
+
+		expr = ExprRange{
+			Loc: token.Loc,
+			Lower: token.Text[0],
+			Upper: token.Text[1],
+		}
+
 		return
 	case TokenString:
 		var ellipsis Token
