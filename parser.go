@@ -280,7 +280,8 @@ func IsPrimaryStart(kind TokenKind) bool {
 		kind == TokenBracketOpen ||
 		kind == TokenCurlyOpen ||
 		kind == TokenParenOpen ||
-		kind == TokenNumber
+		kind == TokenNumber ||
+		kind == TokenAsterisk
 }
 
 func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
