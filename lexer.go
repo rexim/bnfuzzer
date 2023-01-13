@@ -59,6 +59,7 @@ const (
 	TokenNumber
 	TokenAsterisk
 	TokenIncAlternative
+	TokenValueRange
 )
 
 var TokenKindName = map[TokenKind]string{
@@ -77,6 +78,7 @@ var TokenKindName = map[TokenKind]string{
 	TokenNumber: "number",
 	TokenAsterisk: "asterisk",
 	TokenIncAlternative: "incremental alternative",
+	TokenValueRange: "value range",
 }
 
 type LiteralToken struct {
@@ -142,6 +144,34 @@ func (lexer *Lexer) Loc() Loc {
 	}
 }
 
+func (lexer *Lexer) ChopHexByteValue() (result rune, err error) {
+	for i := 0; i < 2; i += 1 {
+		if lexer.Col >= len(lexer.Content) {
+			err = &DiagErr{
+				Loc: lexer.Loc(),
+				Err: fmt.Errorf("Unfinished hexadecimal value of a byte. Expected 2 hex digits, but got %d.", i),
+			}
+			return
+		}
+		x := lexer.Content[lexer.Col]
+		if '0' <= x && x <= '9' {
+			result = result*0x10 + x - '0'
+		} else if 'a' <= x && x <= 'f' {
+			result = result*0x10 + x - 'a' + 10
+		} else if 'A' <= x && x <= 'F' {
+			result = result*0x10 + x - 'A' + 10
+		} else {
+			err = &DiagErr{
+				Loc: lexer.Loc(),
+				Err: fmt.Errorf("Expected hex digit, but got `%c`", x),
+			}
+			return
+		}
+		lexer.Col += 1
+	}
+	return
+}
+
 func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 	if lexer.Col >= len(lexer.Content) {
 		return
@@ -177,32 +207,12 @@ func (lexer *Lexer) ChopStrLit() (lit []rune, err error) {
 				lexer.Col += 1
 			case 'x':
 				lexer.Col += 1
-				var result rune = 0
-				for i := 0; i < 2; i += 1 {
-					if lexer.Col >= len(lexer.Content) {
-						err = &DiagErr{
-							Loc: lexer.Loc(),
-							Err: fmt.Errorf("Unfinished hexadecimal value of a byte. Expected 2 hex digits, but got %d.", i),
-						}
-						return
-					}
-					x := lexer.Content[lexer.Col]
-					if '0' <= x && x <= '9' {
-						result = result*0x10 + x - '0'
-					} else if 'a' <= x && x <= 'f' {
-						result = result*0x10 + x - 'a' + 10
-					} else if 'A' <= x && x <= 'F' {
-						result = result*0x10 + x - 'A' + 10
-					} else {
-						err = &DiagErr{
-							Loc: lexer.Loc(),
-							Err: fmt.Errorf("Expected hex digit, but got `%c`", x),
-						}
-						return
-					}
-					lexer.Col += 1
+				var value rune
+				value, err = lexer.ChopHexByteValue()
+				if err != nil {
+					return
 				}
-				lit = append(lit, result)
+				lit = append(lit, value)
 			default:
 				if lexer.Content[lexer.Col] == quote {
 					lit = append(lit, quote)
@@ -322,6 +332,34 @@ func (lexer *Lexer) ChopToken() (token Token, err error) {
 		}
 		token.Kind = TokenString
 		token.Text = lit
+		return
+	}
+	if lexer.Prefix([]rune("%x")) {
+		lexer.Col += 2
+
+		var lower, upper rune
+
+		lower, err = lexer.ChopHexByteValue()
+		if err != nil {
+			return
+		}
+
+		if !lexer.Prefix([]rune("-")) {
+			err = &DiagErr{
+				Loc: lexer.Loc(),
+				Err: fmt.Errorf("Expected dash between lower and upper bounds of value range token"),
+			}
+			return
+		}
+		lexer.Col += 1
+
+		upper, err = lexer.ChopHexByteValue()
+		if err != nil {
+			return
+		}
+
+		token.Kind = TokenValueRange
+		token.Text = []rune{lower, upper}
 		return
 	}
 

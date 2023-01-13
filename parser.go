@@ -133,6 +133,12 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			Loc:  token.Loc,
 			Name: string(token.Text),
 		}
+	case TokenValueRange:
+		err = &DiagErr{
+			Loc: token.Loc,
+			Err: fmt.Errorf("TODO: Parsing value ranges is not implemented yet"),
+		}
+		return
 	case TokenString:
 		var ellipsis Token
 		ellipsis, err = lexer.Peek()
@@ -281,7 +287,8 @@ func IsPrimaryStart(kind TokenKind) bool {
 		kind == TokenCurlyOpen ||
 		kind == TokenParenOpen ||
 		kind == TokenNumber ||
-		kind == TokenAsterisk
+		kind == TokenAsterisk ||
+		kind == TokenValueRange
 }
 
 func ParseConcatExpr(lexer *Lexer) (expr Expr, err error) {
