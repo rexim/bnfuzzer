@@ -146,7 +146,7 @@ func main() {
 	}
 	content, err := os.ReadFile(*filePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: could not read file %s: %s\n", *filePath, err)
+		fmt.Fprintf(os.Stderr, "ERROR: %s\n", err)
 		os.Exit(1)
 	}
 	grammar := map[string]Rule{}
