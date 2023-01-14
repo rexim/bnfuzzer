@@ -133,7 +133,7 @@ func (expr ExprRange) GetLoc() Loc {
 }
 
 func (expr ExprRange) String() string {
-	panic("TODO: ExprRange.String() is not implemented")
+	return fmt.Sprintf("%%x%02X-%02X", expr.Lower, expr.Upper)
 }
 
 func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
