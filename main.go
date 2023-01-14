@@ -127,12 +127,33 @@ type Rule struct {
 	Body Expr
 }
 
+func (rule Rule) String() string {
+	sep := ""
+	for i := range LiteralTokens {
+		if LiteralTokens[i].Kind == TokenDefinition {
+			sep = LiteralTokens[i].Text
+			break
+		}
+	}
+	if len(sep) == 0 {
+		// This should be possible to check at compile time in 2023
+		panic("Not a single TokenAlternation exists to render ExprAlternation")
+	}
+
+	sb := strings.Builder{}
+	sb.WriteString(string(rule.Head.Text))
+	sb.WriteString(" "+sep+" ")
+	sb.WriteString(rule.Body.String())
+	return sb.String()
+}
+
 func main() {
 	rand.Seed(time.Now().UnixNano())
 	filePath := flag.String("file", "", "Path to the BNF file")
 	entry := flag.String("entry", "", "The symbol name to start generating from. Passing '!' as the symbol name lists all of the available symbols in the -file.")
 	count := flag.Int("count", 1, "How many messages to generate")
 	verify := flag.Bool("verify", false, "Verify that all the symbols are defined")
+	dump := flag.Bool("dump", false, "Dump the text representation of -entry symbol")
 	flag.Parse()
 	if len(*filePath) == 0 {
 		fmt.Fprintf(os.Stderr, "ERROR: -file is not provided\n")
@@ -272,10 +293,16 @@ func main() {
 		return
 	}
 
+
 	expr, ok := grammar[*entry]
 	if !ok {
 		fmt.Printf("ERROR: Symbol %s is not defined. Pass -entry '!' to get the list of defined symbols.\n", *entry)
 		os.Exit(1)
+	}
+
+	if *dump {
+		fmt.Println(expr.String())
+		return
 	}
 
 	for i := 0; i < *count; i += 1 {

@@ -1,9 +1,14 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+	"unicode"
+)
 
 type Expr interface {
 	GetLoc() Loc
+	String() string
 }
 
 type ExprSymbol struct {
@@ -15,6 +20,10 @@ func (expr ExprSymbol) GetLoc() Loc {
 	return expr.Loc
 }
 
+func (expr ExprSymbol) String() string {
+	return expr.Name
+}
+
 type ExprString struct {
 	Loc Loc
 	Text []rune
@@ -22,6 +31,28 @@ type ExprString struct {
 
 func (expr ExprString) GetLoc() Loc {
 	return expr.Loc
+}
+
+func (expr ExprString) String() string {
+	sb := strings.Builder{}
+	sb.WriteRune('"')
+	for i := range expr.Text {
+		switch expr.Text[i] {
+		case '\n': sb.WriteString("\\n")
+		case '\r': sb.WriteString("\\r")
+		case '\\': sb.WriteString("\\\\")
+		case '"':  sb.WriteString("\\")
+		default:
+			if (unicode.IsGraphic(expr.Text[i])) {
+				sb.WriteRune(expr.Text[i])
+			} else {
+				// TODO: this may not work correctly cause expr.Text[i] could be > 0xFF
+				sb.WriteString(fmt.Sprintf("\\x02x", expr.Text[i]))
+			}
+		}
+	}
+	sb.WriteRune('"')
+	return sb.String()
 }
 
 type ExprAlternation struct {
@@ -33,6 +64,29 @@ func (expr ExprAlternation) GetLoc() Loc {
 	return expr.Loc
 }
 
+func (expr ExprAlternation) String() string {
+	sep := ""
+	for i := range LiteralTokens {
+		if LiteralTokens[i].Kind == TokenAlternation {
+			sep = LiteralTokens[i].Text
+			break
+		}
+	}
+	if len(sep) == 0 {
+		// This should be possible to check at compile time in 2023
+		panic("Not a single TokenAlternation exists to render ExprAlternation")
+	}
+
+	sb := strings.Builder{}
+	for i := range expr.Variants {
+		if i > 0 {
+			sb.WriteString(" "+sep+" ")
+		}
+		sb.WriteString(expr.Variants[i].String())
+	}
+	return sb.String()
+}
+
 type ExprConcat struct {
 	Loc Loc
 	Elements []Expr
@@ -40,6 +94,17 @@ type ExprConcat struct {
 
 func (expr ExprConcat) GetLoc() Loc {
 	return expr.Loc
+}
+
+func (expr ExprConcat) String() string {
+	sb := strings.Builder{}
+	for i := range expr.Elements {
+		if i > 0 {
+			sb.WriteString(" ")
+		}
+		sb.WriteString(expr.Elements[i].String())
+	}
+	return sb.String()
 }
 
 type ExprRepetition struct {
@@ -53,6 +118,10 @@ func (expr ExprRepetition) GetLoc() Loc {
 	return expr.Loc
 }
 
+func (expr ExprRepetition) String() string {
+	return fmt.Sprintf("%d*%d(%s)", expr.Lower, expr.Upper, expr.Body.String())
+}
+
 type ExprRange struct {
 	Loc Loc
 	Lower rune
@@ -61,6 +130,10 @@ type ExprRange struct {
 
 func (expr ExprRange) GetLoc() Loc {
 	return expr.Loc
+}
+
+func (expr ExprRange) String() string {
+	panic("TODO: ExprRange.String() is not implemented")
 }
 
 func ExpectToken(lexer *Lexer, kind TokenKind) (token Token, err error) {
