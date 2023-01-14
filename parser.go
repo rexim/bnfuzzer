@@ -323,8 +323,7 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			}
 			return
 		}
-
-		lexer.PeekFull = false;
+		lexer.PeekFull = false
 
 		var upper Token
 		upper, err = lexer.Peek()
@@ -342,6 +341,7 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			}
 			return
 		}
+		lexer.PeekFull = false
 
 		body, err = ParsePrimaryExpr(lexer)
 		if err != nil {

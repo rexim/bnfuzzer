@@ -294,19 +294,19 @@ func main() {
 	}
 
 
-	expr, ok := grammar[*entry]
+	rule, ok := grammar[*entry]
 	if !ok {
 		fmt.Printf("ERROR: Symbol %s is not defined. Pass -entry '!' to get the list of defined symbols.\n", *entry)
 		os.Exit(1)
 	}
 
 	if *dump {
-		fmt.Println(expr.String())
+		fmt.Printf("%s: %s\n", rule.Head.Loc, rule.String())
 		return
 	}
 
 	for i := 0; i < *count; i += 1 {
-		message, err := GenerateRandomMessage(grammar, expr.Body)
+		message, err := GenerateRandomMessage(grammar, rule.Body)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 			os.Exit(1)

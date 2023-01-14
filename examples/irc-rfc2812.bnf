@@ -25,11 +25,6 @@ hostname   =  shortname *( "." shortname )
 shortname  =  ( letter / digit ) *( letter / digit / "-" ) *( letter / digit )
                 ; as specified in RFC 1123 [HNAME]
 hostaddr   =  ip4addr / ip6addr
-; TODO: bug with repetitions
-; ```console
-; $ go run . -file ./examples/irc-rfc2812.bnf -entry ip4addr -verify -count 10
-; ```
-; The command above produces weird IPs
 ip4addr    =  1*3digit "." 1*3digit "." 1*3digit "." 1*3digit
 ip6addr    =  1*hexdigit 7( ":" 1*hexdigit )
 ip6addr    =/ "0:0:0:0:0:" ( "0" / "FFFF" ) ":" ip4addr
