@@ -287,6 +287,15 @@ func main() {
 			names = append(names, name)
 		}
 		sort.Strings(names)
+
+		if *dump {
+			for i := range names {
+				rule := grammar[names[i]]
+				fmt.Printf("%s: %s\n", rule.Head.Loc, rule.String())
+			}
+			return
+		}
+
 		for i := range names {
 			fmt.Println(names[i])
 		}
