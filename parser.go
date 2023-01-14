@@ -287,6 +287,7 @@ func ParsePrimaryExpr(lexer *Lexer) (expr Expr, err error) {
 			}
 			return
 		}
+		lexer.PeekFull = false
 
 		body, err = ParsePrimaryExpr(lexer)
 		if err != nil {
