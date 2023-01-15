@@ -122,48 +122,49 @@ func VerifyThatAllSymbolsDefined(grammar map[string]Rule) (ok bool) {
 	return
 }
 
-func CollectUsedSymbolsInExpr(expr Expr, used map[string]bool) {
+func WalkSymbolsInExpr(grammar map[string]Rule, expr Expr, visited map[string]bool) (err error) {
 	switch expr := expr.(type) {
 	case ExprSymbol:
-		used[expr.Name] = true
+		if !visited[expr.Name] {
+			visited[expr.Name] = true
+			rule, exists := grammar[expr.Name]
+			if !exists {
+				err = &DiagErr{
+					Loc: expr.Loc,
+					Err: fmt.Errorf("Symbol <%s> is not defined", expr.Name),
+				}
+				return
+			}
+			err = WalkSymbolsInExpr(grammar, rule.Body, visited)
+			if err != nil {
+				return
+			}
+		}
 		return
 	case ExprString:
 		return
 	case ExprAlternation:
 		for i := range expr.Variants {
-			CollectUsedSymbolsInExpr(expr.Variants[i], used)
+			err = WalkSymbolsInExpr(grammar, expr.Variants[i], visited)
+			if err != nil {
+				return
+			}
 		}
 		return
 	case ExprConcat:
 		for i := range expr.Elements {
-			CollectUsedSymbolsInExpr(expr.Elements[i], used)
+			err = WalkSymbolsInExpr(grammar, expr.Elements[i], visited)
+			if err != nil {
+				return
+			}
 		}
 		return
 	case ExprRepetition:
-		CollectUsedSymbolsInExpr(expr.Body, used)
-		return
+		return WalkSymbolsInExpr(grammar, expr.Body, visited)
 	case ExprRange:
 		return
 	}
 	panic(fmt.Sprintf("unreachable: %T", expr))
-}
-
-func VerifyThatAllSymbolsAreUsed(grammar map[string]Rule, entry string) (ok bool) {
-	ok = true
-	used := map[string]bool{}
-	if entry != "!" {
-		used[entry] = true
-	}
-	for name := range grammar {
-		CollectUsedSymbolsInExpr(grammar[name].Body, used)
-	}
-	for name := range grammar {
-		if !used[name] {
-			fmt.Fprintf(os.Stderr, "%s: %s is unused\n", grammar[name].Head.Loc, name)
-			ok = false
-		}
-	}
-	return
 }
 
 type Rule struct {
@@ -326,13 +327,6 @@ func main() {
 		}
 	}
 
-	if *unused {
-		ok := VerifyThatAllSymbolsAreUsed(grammar, *entry)
-		if !ok {
-			os.Exit(1)
-		}
-	}
-
 	if *entry == "!" {
 		names := []string{}
 		for name := range grammar {
@@ -358,6 +352,23 @@ func main() {
 	if !ok {
 		fmt.Printf("ERROR: Symbol %s is not defined. Pass -entry '!' to get the list of defined symbols.\n", *entry)
 		os.Exit(1)
+	}
+
+	if *unused {
+		visited := map[string]bool{}
+		visited[*entry] = true
+		err = WalkSymbolsInExpr(grammar, rule.Body, visited)
+
+		ok := true
+		for name := range grammar {
+			if !visited[name] {
+				fmt.Fprintf(os.Stderr, "%s: %s is unused\n", grammar[name].Head.Loc, name)
+				ok = false
+			}
+		}
+		if !ok {
+			os.Exit(1)
+		}
 	}
 
 	if *dump {
