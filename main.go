@@ -122,6 +122,50 @@ func VerifyThatAllSymbolsDefined(grammar map[string]Rule) (ok bool) {
 	return
 }
 
+func CollectUsedSymbolsInExpr(expr Expr, used map[string]bool) {
+	switch expr := expr.(type) {
+	case ExprSymbol:
+		used[expr.Name] = true
+		return
+	case ExprString:
+		return
+	case ExprAlternation:
+		for i := range expr.Variants {
+			CollectUsedSymbolsInExpr(expr.Variants[i], used)
+		}
+		return
+	case ExprConcat:
+		for i := range expr.Elements {
+			CollectUsedSymbolsInExpr(expr.Elements[i], used)
+		}
+		return
+	case ExprRepetition:
+		CollectUsedSymbolsInExpr(expr.Body, used)
+		return
+	case ExprRange:
+		return
+	}
+	panic(fmt.Sprintf("unreachable: %T", expr))
+}
+
+func VerifyThatAllSymbolsAreUsed(grammar map[string]Rule, entry string) (ok bool) {
+	ok = true
+	used := map[string]bool{}
+	if entry != "!" {
+		used[entry] = true
+	}
+	for name := range grammar {
+		CollectUsedSymbolsInExpr(grammar[name].Body, used)
+	}
+	for name := range grammar {
+		if !used[name] {
+			fmt.Fprintf(os.Stderr, "%s: %s is unused\n", grammar[name].Head.Loc, name)
+			ok = false
+		}
+	}
+	return
+}
+
 type Rule struct {
 	Head Token
 	Body Expr
@@ -153,6 +197,7 @@ func main() {
 	entry := flag.String("entry", "", "The symbol name to start generating from. Passing '!' as the symbol name lists all of the available symbols in the -file.")
 	count := flag.Int("count", 1, "How many messages to generate")
 	verify := flag.Bool("verify", false, "Verify that all the symbols are defined")
+	unused := flag.Bool("unused", false, "Verify that all the symbols are used")
 	dump := flag.Bool("dump", false, "Dump the text representation of -entry symbol")
 	flag.Parse()
 	if len(*filePath) == 0 {
@@ -281,6 +326,13 @@ func main() {
 		}
 	}
 
+	if *unused {
+		ok := VerifyThatAllSymbolsAreUsed(grammar, *entry)
+		if !ok {
+			os.Exit(1)
+		}
+	}
+
 	if *entry == "!" {
 		names := []string{}
 		for name := range grammar {
@@ -301,7 +353,6 @@ func main() {
 		}
 		return
 	}
-
 
 	rule, ok := grammar[*entry]
 	if !ok {
