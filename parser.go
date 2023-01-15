@@ -47,7 +47,7 @@ func (expr ExprString) String() string {
 				sb.WriteRune(expr.Text[i])
 			} else {
 				// TODO: this may not work correctly cause expr.Text[i] could be > 0xFF
-				sb.WriteString(fmt.Sprintf("\\x02x", expr.Text[i]))
+				sb.WriteString(fmt.Sprintf("\\x%02x", expr.Text[i]))
 			}
 		}
 	}
@@ -102,7 +102,12 @@ func (expr ExprConcat) String() string {
 		if i > 0 {
 			sb.WriteString(" ")
 		}
-		sb.WriteString(expr.Elements[i].String())
+		switch expr.Elements[i].(type) {
+		case ExprAlternation:
+			sb.WriteString("( "+expr.Elements[i].String()+" )")
+		default:
+			sb.WriteString(expr.Elements[i].String())
+		}
 	}
 	return sb.String()
 }
@@ -119,7 +124,13 @@ func (expr ExprRepetition) GetLoc() Loc {
 }
 
 func (expr ExprRepetition) String() string {
-	return fmt.Sprintf("%d*%d(%s)", expr.Lower, expr.Upper, expr.Body.String())
+	if expr.Lower == 0 && expr.Upper == 1 {
+		return fmt.Sprintf("[ %s ]", expr.Body.String())
+	}
+	if expr.Lower == expr.Upper {
+		return fmt.Sprintf("%d( %s )", expr.Lower, expr.Body.String())
+	}
+	return fmt.Sprintf("%d*%d( %s )", expr.Lower, expr.Upper, expr.Body.String())
 }
 
 type ExprRange struct {
