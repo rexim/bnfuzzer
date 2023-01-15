@@ -382,6 +382,6 @@ func main() {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 			os.Exit(1)
 		}
-		fmt.Println(string(message))
+		fmt.Print(string(message))
 	}
 }
