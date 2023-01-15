@@ -67,7 +67,7 @@ is equivalent to
 ruleset = alt1 / alt2 / alt3 / alt4 / alt5
 ```
 
-*Maybe to maintain the consistency in supporting mixed up syntax, we should allow to use `=|` along wit `=/`...*
+*Maybe to maintain the consistency with supporting mixed up syntax, we should allow to use `=|` along with `=/`...*
 
 ### Value range
 
